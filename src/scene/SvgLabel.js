@@ -11,8 +11,19 @@ pv.SvgScene.label = function(scenes) {
     /* text-baseline, text-align */
     var x = 0, y = 0, dy = 0, anchor = "start";
     switch (s.textBaseline) {
-      case "middle": dy = ".35em"; break;
-      case "top": dy = ".71em"; y = s.textMargin; break;
+      case "middle":
+          if (pv.renderer() == 'svgweb')
+              y = 3; // flex doesn't seem to use dy, so this moves it to be 'about right'
+          else
+              dy = ".35em";
+          break;
+      case "top":
+          if (pv.renderer() == 'svgweb') {
+              y = 9 + s.textMargin; // flex doesn't seem to use dy, so this moves it to be 'about right'
+          } else {
+              dy = ".71em"; y = s.textMargin;
+          }
+        break;
       case "bottom": y = "-" + s.textMargin; break;
     }
     switch (s.textAlign) {
