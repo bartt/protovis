@@ -587,7 +587,7 @@ pv.Mark.prototype.render = function() {
    * instance of the panel will be rendered; otherwise, all visible instances of
    * the mark will be rendered.
    */
-  function render(mark, depth) {
+  var render = function(mark, depth) {
     if (depth < indexes.length) {
       var childIndex = indexes[depth], child = mark.children[childIndex];
       if (mark.hasOwnProperty("index")) {
@@ -1006,9 +1006,27 @@ pv.Mark.prototype.event = function(type, handler) {
 
 /** @private TODO */
 pv.Mark.prototype.dispatch = function(e, scenes, index) {
+
   var l = this.$handlers && this.$handlers[e.type];
+
   if (!l) return this.parent
       && this.parent.dispatch(e, scenes.parent, scenes.parentIndex);
+
+  if (pv.renderer() == 'svgweb' && e.type != 'mousemove') {
+    // In SVGWeb, when nodes are rerendered, the re-render
+    // can cause SVGWeb to tirgger a mouseover event for the
+    // newly renderer node. As many graphs re-render the same
+    // node, changing color etc, this causes an infinite
+    // stream of mouseover events.
+    //
+    // This hack avoids this, by ensuring we don't
+    // retrigger if we are getting the same event as last time
+    // for the same indexed item, unless it's a mousemove.
+    this.lastDispatchLog = this.lastDispatchLog || {};
+    if (this.lastDispatchLog[e.type] == index)
+      return;
+    this.lastDispatchLog[e.type] = index;
+  }
 
   try {
     /* Setup the scene stack. */

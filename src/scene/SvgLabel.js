@@ -38,7 +38,14 @@ pv.SvgScene.label = function(scenes) {
         "text-decoration": s.textDecoration
       });
     if (e.firstChild) e.firstChild.nodeValue = s.text;
-    else e.appendChild(document.createTextNode(s.text));
+    else {
+        if (pv.renderer() == "svgweb") { // SVGWeb needs an extra 'true' to create SVG text nodes properly in IE.
+            e.appendChild(document.createTextNode(s.text, true));
+        } else {
+            e.appendChild(document.createTextNode(s.text));
+        }
+    }
+
     e = this.append(e, scenes, i);
   }
   return e;

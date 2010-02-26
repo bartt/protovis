@@ -16,26 +16,52 @@ pv.SvgScene.panel = function(scenes) {
         e = g && g.firstChild;
       }
       if (!g) {
-        g = s.canvas.appendChild(this.create("svg"));
+        g = this.create("svg");
         g.setAttribute("font-size", "10px");
         g.setAttribute("font-family", "sans-serif");
         g.setAttribute("fill", "none");
         g.setAttribute("stroke", "none");
         g.setAttribute("stroke-width", 1.5);
         g.style.display = "inline-block";
-        g.onclick
-            = g.onmousedown
-            = g.onmouseup
-            = g.onmousemove
-            = g.onmouseout
-            = g.onmouseover
-            = g.onmousewheel
-            = this.dispatch;
+
+        if (pv.renderer() == "svgweb") { // SVGWeb requires a separate mechanism for setting event listeners.
+            // width/height can't be set on the fragment
+            g.setAttribute("width", s.width + s.left + s.right);
+            g.setAttribute("height", s.height + s.top + s.bottom);
+
+            var frag = document.createDocumentFragment(true);
+
+            g.addEventListener('SVGLoad', function() {
+                this.appendChild(frag);
+                this.addEventListener ('click', pv.SvgScene.dispatch, true);
+                this.addEventListener ('mousedown', pv.SvgScene.dispatch, true);
+                this.addEventListener ('mouseup', pv.SvgScene.dispatch, true);
+                this.addEventListener ('mouseout', pv.SvgScene.dispatch, true);
+                this.addEventListener ('mouseover', pv.SvgScene.dispatch, true);
+                scenes.$g = this;
+            }, false);
+
+            svgweb.appendChild (g, s.canvas);
+            g = frag;
+        } else {
+            g.onclick
+                = g.onmousedown
+                = g.onmouseup
+                = g.onmousemove
+                = g.onmouseout
+                = g.onmouseover
+                = g.onmousewheel
+                = this.dispatch;
+            g = s.canvas.appendChild(g);
+        }
+
         e = g.firstChild;
       }
       scenes.$g = g;
-      g.setAttribute("width", s.width + s.left + s.right);
-      g.setAttribute("height", s.height + s.top + s.bottom);
+      if (pv.renderer() != 'svgweb') {
+        g.setAttribute("width", s.width + s.left + s.right);
+        g.setAttribute("height", s.height + s.top + s.bottom);
+      }
     }
 
     /* clip (nest children) */

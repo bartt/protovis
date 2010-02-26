@@ -96,7 +96,10 @@ pv.SvgScene.expect = function(e, type, attributes, style) {
   for (var name in style) {
     var value = style[name];
     if (value == this.implicit.css[name]) value = null;
-    if (value == null) e.style.removeProperty(name);
+    if (value == null) {
+        if (pv.renderer() != 'svgweb') // svgweb doesn't support removeproperty TODO SVGWEB
+            e.style.removeProperty(name);
+    }
     else e.style.setProperty(name, value);
   }
   return e;
@@ -130,7 +133,11 @@ pv.SvgScene.title = function(e, s) {
       if (e.parentNode) e.parentNode.replaceChild(a, e);
       a.appendChild(e);
     }
-    a.setAttributeNS(ns.xlink, "title", s.title);
+
+    // Set the title. Using xlink:title ensures the call works in IE
+    // but only FireFox seems to show the title.
+    // without xlink: in there, it breaks IE.
+    a.setAttributeNS(ns.xlink, "xlink:title", s.title);
     return a;
   }
   if (a) a.parentNode.replaceChild(e, a);

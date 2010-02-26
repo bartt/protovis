@@ -127,3 +127,13 @@ pv.listener = function(listener) {
       }
     };
 };
+
+/**
+ * @public Returns the name of the renderer we're using -
+ *
+ * 'nativesvg' is the default - the native svg of the browser.
+ * 'svgweb' is if we identify svgweb is there.
+ */
+pv.renderer = function() {
+    return (typeof window.svgweb === "undefined") ? "nativesvg" : "svgweb";
+}
