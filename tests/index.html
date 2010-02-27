@@ -63,14 +63,17 @@ pv.listen (window, "load", function () {
             <li>Completely re-rendering a graph may or may not work. It
             seems a little flakey. That is - calling <code>vis.render()</code>
             on a visualisation previously rendered may or may not work.
-            I'm sure this is fairly simple to fix.
+            I'm sure this is fairly simple to fix.<b>upate:</b> This works
+            fine on the polar clock example.
             <li>Creating a whole new visualistion (by going <code> var vis = new pv.Panel()</code>
             and rendering to the same div as a previous render currently is
             not good - this is to do with the underlying flash object not
             cleaning up correctly.
             <li>Text labels seem to have their vertical text-alignment 
             default to something different to non-SVGWeb rendering. It
-            is likely easy to fix....
+            is likely easy to fix....<b>update:</b> A change has been implemented
+            to make the default text size look better, but it is likely
+            to need to be tweaked for text sizes larger than 10px.
             <li>The flash renderer is slower than native rendering, so
             frequent re-rendering of a graph will easily bog the browser
             down, and probably won't work (so don't try sub-1s re-rendering).
@@ -78,7 +81,12 @@ pv.listen (window, "load", function () {
             graph, and longer term we can probably find some performance
             improvements for it.
             <li>The flash renderer doesn't seem to get circle's correct - 
-            see the polar clock for an example.
+            see the polar clock for an example. This also occurs in other
+            situations - e.g. see the antibiotics example.
+            <li>Rotated text does not work with SVGWeb. This is due to a known
+            limitation with the Flash SVG rendering. See 
+            <a href="http://code.google.com/p/svgweb/issues/detail?id=158">
+            this SVGWeb bug report</a> for details.
         </ul>
 
         <h2>Tests</h2>
@@ -94,6 +102,7 @@ pv.listen (window, "load", function () {
 
 <a href="./examples/wheat.html">./examples/wheat.html</a><br>
 <a href="./examples/polarclock.html">./examples/polarclock.html</a><br>
+<a href="./examples/antibiotics.html">./examples/antibiotics.html</a><br>
 <a href="./interaction/bar1.html">./interaction/bar1.html</a><br>
 <a href="./mark/bar-column-grouped.html">./mark/bar-column-grouped.html</a><br>
 <a href="./mark/area.html">./mark/area-stacked.html</a><br>
