@@ -1,4 +1,4 @@
-// 376fd41b59cfc8b57dd029f93d7100a63c6e4552
+// 87119995c5dc38d43b6b5dd69387e719a30f25bc
 /**
  * @class The built-in Array class.
  * @name Array
@@ -304,6 +304,9 @@ pv.error = function(e) {
  * @param {function} the event handler callback.
  */
 pv.listen = function(target, type, listener) {
+  if (type == 'load' || type == 'onload')
+      return pv.listenForPageLoad (pv.listener(listener));
+
   listener = pv.listener(listener);
   return target.addEventListener
       ? target.addEventListener(type, listener, false)
@@ -327,6 +330,32 @@ pv.listener = function(listener) {
       }
     };
 };
+
+/**
+ * Binds to the page ready event in a browser-agnostic
+ * fashion (i.e. that works under IE!)
+ */
+pv.listenForPageLoad = function(listener) {
+
+    // Catch cases where $(document).ready() is called after the
+    // browser event has already occurred.
+    if ( document.readyState === "complete" ) {
+        listener();
+    }
+
+    // Mozilla, Opera and webkit nightlies currently support this event
+    if ( document.addEventListener ) {
+
+        // A fallback to window.onload, that will always work
+        window.addEventListener( "load", listener, false );
+
+        // If IE event model is used
+    } else if ( document.attachEvent ) {
+
+        // A fallback to window.onload, that will always work
+        window.attachEvent( "onload", listener );
+    }
+}
 
 /**
  * @public Returns the name of the renderer we're using -
@@ -10915,8 +10944,9 @@ pv.listen(window, "load", function() {
     * could overwrite local variables here (such as the index, `i`)!  To protect
     * against this, all variables are explicitly scoped on a pv.$ object.
     */
-    pv.$ = {i:0, x:document.getElementsByTagName("script")};
-    for (; pv.$.i < pv.$.x.length; pv.$.i++) {
+   pv.$ = {i:0, x:document.getElementsByTagName("script")};
+    pv.$.xlen = pv.$.x.length;
+    for (; pv.$.i < pv.$.xlen; pv.$.i++) {
       pv.$.s = pv.$.x[pv.$.i];
       if (pv.$.s.type == "text/javascript+protovis") {
         try {
