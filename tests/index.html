@@ -74,7 +74,10 @@
             <li>Rotated text does not work with SVGWeb. This is due to a known
             limitation with the Flash SVG rendering. See 
             <a href="http://code.google.com/p/svgweb/issues/detail?id=158">
-            this SVGWeb bug report</a> for details.
+            this SVGWeb bug report</a> for details. Sadly, SVGWeb also does not
+        support SVG fonts referenced via a <code>font-face</code> definition
+        (see <a href="http://code.google.com/p/svgweb/issues/detail?id=288">this
+            SVGWeb issue</a>).
         </ul>
 
         <h2>Tests</h2>
@@ -88,6 +91,7 @@
     <p>
             
 <a href="./interaction/bar1.html">./interaction/bar1.html</a><br>
+<a href="./interaction/reverseScale.html">./interaction/reverseScale.html</a><br>
 <a href="./mark/bar-column-grouped.html">./mark/bar-column-grouped.html</a><br>
 <a href="./mark/label-decoration.html">./mark/label-decoration.html</a><br>
 <a href="./mark/cursor.html">./mark/cursor.html</a><br>

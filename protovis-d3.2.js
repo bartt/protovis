@@ -1,4 +1,4 @@
-// 87119995c5dc38d43b6b5dd69387e719a30f25bc
+// 64009005d5cfba8f302289e6e14d56f93f6a46c7
 /**
  * @class The built-in Array class.
  * @name Array
@@ -5084,6 +5084,7 @@ pv.SvgScene.panel = function(scenes) {
                 this.addEventListener ('mouseup', pv.SvgScene.dispatch, true);
                 this.addEventListener ('mouseout', pv.SvgScene.dispatch, true);
                 this.addEventListener ('mouseover', pv.SvgScene.dispatch, true);
+                this.addEventListener ('mousemove', pv.SvgScene.dispatch, true);
                 scenes.$g = this;
             }, false);
 
@@ -5913,7 +5914,13 @@ pv.Mark.prototype.render = function() {
      * build phase are simply translated into SVG. The update phase is decoupled
      * (see pv.Scene) to allow different rendering engines.
      */
+    var id = null;
+    if (mark.scene && mark.scene.$g && mark.scene.$g.suspendRedraw)
+        id = mark.scene.$g.suspendRedraw(1000);
     pv.Scene.updateAll(mark.scene);
+    if (id)
+        mark.scene.$g.unsuspendRedraw(id);
+
     delete mark.root.scene.data;
   }
 
@@ -6227,20 +6234,24 @@ var property;
  * @returns {pv.Vector} the mouse location.
  */
 pv.Mark.prototype.mouse = function() {
-  var x = pv.event.pageX,
-      y = pv.event.pageY,
-      t = pv.Transform.identity,
-      panel = (this instanceof pv.Panel) ? this : this.parent,
-      node = this.root.canvas();
-  do {
-    x -= node.offsetLeft;
-    y -= node.offsetTop;
-  } while (node = node.offsetParent);
-  do {
-    t = t.translate(panel.left(), panel.top()).times(panel.transform());
-  } while (panel = panel.parent);
-  t = t.invert();
-  return pv.vector(x * t.k + t.x, y * t.k + t.y);
+  if (pv.renderer() == 'svgweb') {
+      return pv.vector (pv.event.clientX * 1, pv.event.clientY * 1);
+  } else {
+      var x = pv.event.pageX,
+          y = pv.event.pageY,
+          t = pv.Transform.identity,
+          panel = (this instanceof pv.Panel) ? this : this.parent,
+          node = this.root.canvas();
+      do {
+        x -= node.offsetLeft;
+        y -= node.offsetTop;
+      } while (node = node.offsetParent);
+      do {
+        t = t.translate(panel.left(), panel.top()).times(panel.transform());
+      } while (panel = panel.parent);
+      t = t.invert();
+      return pv.vector(x * t.k + t.x, y * t.k + t.y);
+  }
 };
 
 /**
@@ -6302,9 +6313,6 @@ pv.Mark.prototype.dispatch = function(e, scenes, index) {
 
   var l = this.$handlers && this.$handlers[e.type];
 
-  if (!l) return this.parent
-      && this.parent.dispatch(e, scenes.parent, scenes.parentIndex);
-
   if (pv.renderer() == 'svgweb' && e.type != 'mousemove') {
     // In SVGWeb, when nodes are rerendered, the re-render
     // can cause SVGWeb to tirgger a mouseover event for the
@@ -6319,7 +6327,15 @@ pv.Mark.prototype.dispatch = function(e, scenes, index) {
     if (this.lastDispatchLog[e.type] == index)
       return;
     this.lastDispatchLog[e.type] = index;
+
+    // Ensure if the user mouse-outs of item X, then the mouse
+    // in will work, and vice-versa.
+    if (e.type == 'mouseover') this.lastDispatchLog['mouseout'] = null;
+    if (e.type == 'mouseout') this.lastDispatchLog['mouseover'] = null;
   }
+
+  if (!l) return this.parent
+      && this.parent.dispatch(e, scenes.parent, scenes.parentIndex);
 
   try {
     /* Setup the scene stack. */
