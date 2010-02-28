@@ -1,18 +1,16 @@
 <html>
   <head>
     <title>Grouped Column Chart</title>
-<script type="text/javascript" src="../../3rdparty/svg.js" data-path="../../3rdparty/"></script>
+    <script type="text/javascript" src="../../3rdparty/svg.js" data-path="../../3rdparty/"></script>
     <script type="text/javascript" src="../../protovis-d3.2.js"></script>
     <meta name="svg.render.forceflash" content="true">
-
   </head>
   <body>
-    <script type="text/javascript">
-pv.listen (window, "load", function () { 
+    <script type="text/javascript+protovis">
 
 var n = 3,
     m = 4,
-    data = pv.range(n).map(function() { return pv.range(m).map(Math.random) }),
+    data = pv.range(n).map(function() pv.range(m).map(Math.random)),
     w = 250,
     h = 400,
     x = pv.Scale.ordinal(pv.range(n)).splitBanded(0, w, 4/5),
@@ -28,10 +26,10 @@ var vis = new pv.Panel()
 
 var bar = vis.add(pv.Panel)
     .data(data)
-    .left(function() {return  x(this.index) })
+    .left(function() x(this.index))
   .add(pv.Bar)
-  .data(function(a) {return a})
-  .left(function() {return this.index * x.range().band / m})
+    .data(function(a) a)
+    .left(function() this.index * x.range().band / m)
     .width(x.range().band / m)
     .bottom(0)
     .height(y)
@@ -39,30 +37,29 @@ var bar = vis.add(pv.Panel)
 
 bar.anchor("top").add(pv.Label)
     .textStyle("white")
-    .text(function(d) {return d.toFixed(1) });
+    .text(function(d) d.toFixed(1));
 
 vis.add(pv.Label)
     .data(pv.range(n))
     .bottom(0)
-    .left(function() { return x(this.index) + x.range().band / 2 })
+    .left(function() x(this.index) + x.range().band / 2)
     .textMargin(5)
     .textBaseline("top")
-    .text(function()  {return "ABCDEFGHIJK".charAt(this.index) });
+    .text(function() "ABCDEFGHIJK".charAt(this.index));
 
 vis.add(pv.Rule)
     .data(y.ticks())
-    .bottom(function(d) {return Math.round(y(d)) - .5 })
-    .strokeStyle(function(d) {return d ? "rgba(255,255,255,.3)" : "#000" })
+    .bottom(function(d) Math.round(y(d)) - .5)
+    .strokeStyle(function(d) d ? "rgba(255,255,255,.3)" : "#000")
   .add(pv.Rule)
     .left(0)
     .width(5)
     .strokeStyle("#000")
   .anchor("left").add(pv.Label)
-  .text(function(d) { return d.toFixed(1) });
+    .text(function(d) d.toFixed(1));
 
 vis.render();
 
-});
     </script>
   </body>
 </html>

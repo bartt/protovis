@@ -1,15 +1,12 @@
 <html>
   <head>
     <title>Area Chart</title>
-<script type="text/javascript" src="../../3rdparty/svg.js" data-path="../../3rdparty/"></script>
+    <script type="text/javascript" src="../../3rdparty/svg.js" data-path="../../3rdparty/"></script>
     <script type="text/javascript" src="../../protovis-d3.2.js"></script>
-
     <meta name="svg.render.forceflash" content="true">
   </head>
   <body>
-    <script type="text/javascript">
-pv.listen (window, "load", function () { 
-
+    <script type="text/javascript+protovis">
 var vis = new pv.Panel()
     .def("i", -1)
     .width(150)
@@ -19,17 +16,16 @@ vis.add(pv.Bar)
     .data([1, 1.2, 1.7, 1.5, .7, .2])
     .bottom(0)
     .width(20)
-    .height(function(d) { return d * 80 })
-    .left(function() { return this.index * 25 })
-    .fillStyle(function() { return vis.i() == this.index ? "orange" : "steelblue" })
-    .event("mouseover", function() {return vis.i(this.index) })
-    .event("mouseout", function() {return vis.i(-1) })
+    .height(function(d) d * 80)
+    .left(function() this.index * 25)
+    .fillStyle(function() vis.i() == this.index ? "orange" : "steelblue")
+    .event("mouseover", function() vis.i(this.index))
+    .event("mouseout", function() vis.i(-1))
   .anchor("top").add(pv.Label)
-  .visible(function() {return vis.i() >= 0 })
+  .visible(function() vis.i() >= 0)
     .textStyle("white");
 
 vis.render();
-});
     </script>
   </body>
 </html>

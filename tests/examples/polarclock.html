@@ -1,7 +1,7 @@
 <html>
   <head>
     <title>PolarClock</title>
-<script type="text/javascript" src="../../3rdparty/svg.js" data-path="../../3rdparty/"></script>
+    <script type="text/javascript" src="../../3rdparty/svg.js" data-path="../../3rdparty/"></script>
     <script type="text/javascript" src="../../protovis-d3.2.js"></script>
     <meta name="svg.render.forceflash" content="true">
     <style type="text/css">
@@ -25,9 +25,8 @@
     </style>
   </head>
   <body><div id="center"><div id="fig">
-    <script type="text/javascript">
+    <script type="text/javascript+protovis">
 
-pv.listen (window, "load", function () { 
       var radius = 768 / 2;
 
       /* Generate the fields for the given date. */
@@ -56,7 +55,6 @@ pv.listen (window, "load", function () {
       }
 
       var vis = new pv.Panel()
-          .canvas('fig')
           .width(radius * 2)
           .height(radius * 2);
 
@@ -64,21 +62,20 @@ pv.listen (window, "load", function () {
           .data(fields)
           .left(radius)
           .bottom(radius)
-          .innerRadius(function(d) { return radius * d.index})
-          .outerRadius(function(d) { return radius * (d.index + .1)})
+          .innerRadius(function(d) radius * d.index)
+          .outerRadius(function(d) radius * (d.index + .1))
           .startAngle(-Math.PI / 2)
-          .angle(function(d) {return 2 * Math.PI * d.value})
-          .fillStyle(function(d) {return "hsl(" + (360 * d.value - 180) + ", 50%, 50%)" })
+          .angle(function(d) 2 * Math.PI * d.value)
+          .fillStyle(function(d) "hsl(" + (360 * d.value - 180) + ", 50%, 50%)")
           .lineWidth(4)
           .strokeStyle("#222")
         .anchor("end").add(pv.Label)
           .font("bold 12px sans-serif")
           .textStyle("#000")
           .textMargin(7)
-          .text(function(d) { return d.text });
+          .text(function(d) d.text);
 
-      setInterval(function() { vis.render() }, 1000);
-});
+      setInterval(function() vis.render(), 50);
 
     </script>
   </div></div>
@@ -87,3 +84,4 @@ pv.listen (window, "load", function () {
   </div>
   </body>
 </html>
+

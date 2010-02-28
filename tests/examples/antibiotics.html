@@ -16,9 +16,8 @@
     </style>
   </head>
   <body><div id="center"><div id="fig">
-    <script type="text/javascript">
+    <script type="text/javascript+protovis">
 
-pv.listen (window, "load", function () { 
       /* Basic dimensions. */
       var width = 700;
       var height = 700;
@@ -53,7 +52,6 @@ pv.listen (window, "load", function () {
       /* The root panel. */
       var vis = new pv.Panel()
           .width(width)
-          .canvas('fig')
           .height(height)
           .bottom(100);
 
@@ -134,8 +132,7 @@ pv.listen (window, "load", function () {
           .text(function(d) "Gram-" + d);
 
       vis.render();
-});
+
     </script>
   </center></body>
 </html>
-
