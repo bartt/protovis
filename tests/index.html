@@ -11,7 +11,7 @@
         You can find a fork of the official Protovis source code
         with these changes at <a href="http://gitorious.org/~jlove/protovis/jloves-protovis">
             gitorious</a> (http://gitorious.org/~jlove/protovis/jloves-protovis).
-    <p>
+    <h2>Downloads</h2>
         Or you can download the necessary files here:
         <ul>
             <li>Updated protovis file <a href="../protovis-r3.2.js">production</a>
@@ -22,26 +22,12 @@
             <a href="../3rdparty/svg.swf">svg.swf</a>.
        </ul>
 
+    <h2>How-To</h2>
     To make protovis work using SVGWeb, you need to alter your coding
     style slightly, basically because you need to make it work under IE.
     Namely:
         <ul>
-            <li>Don't use function expressions like <code> function () a.b </code>,
-            instead you have to write long form: <code> function () { return a.b } </code>.
-            This is an IE limitation.
-            <li>Wrap your code in <code>&lt;script> type="text/javascript"&gt;</code>
-            rather than <code>type="text/javascript+protovis"</code>. This ensures
-            that all browsers work smoothly with the following change:
-            <li>Wrap your protovis <code>render()</code> call in a function
-            that is called on page load. This is <b>required</b> for SVGWeb to
-            load correctly. In Chrome it is not necessary, in FireFox if you don't
-            do this you sometimes get two graphs, and IE doesn't work. for example:
-<pre>
-pv.listen (window, "load", function () {
- // all code to create the protovis graph, including the 'vis.render()' line.
-});
-</pre>
-            <li>conditionally include the SVGWeb <code>svg.js</code> file. You
+            <li>Conditionally include the SVGWeb <code>svg.js</code> file. You
             probably don't want to use SVGWeb for non-IE browsers (at least yet).
             You can do this, by, at the top of your HTML file:
 <pre>
@@ -53,27 +39,29 @@ pv.listen (window, "load", function () {
             Make sure to you include 'svg.js' first - it MUST be the first
             javascript file you include. The 'data-path' attribute must reference
             the directory <code>svg.swf</code> is in.
+            <li>Unless using a script type of <code>text+protovis</code>,
+            don't use function expressions like <code> function () a.b </code>,
+            instead you have to write long form: <code> function () { return a.b; } </code>.
+            This is an IE limitation.
     </ul>
- <p>
+    <h2>Bugs using SVGWeb</h2>
         This SVGWeb implementation is not perfect. There are a few bugs
         and what-not to work out still:
         <ul>
             <li>The <code>title</code> property does not work via SVGWeb.
             Use a label instead if possible.
-            <li>Completely re-rendering a graph may or may not work. It
-            seems a little flakey. That is - calling <code>vis.render()</code>
+            <li>Completely re-rendering a graph may not work. It
+            seems a little flaky. That is - calling <code>vis.render()</code>
             on a visualisation previously rendered may or may not work.
             I'm sure this is fairly simple to fix.<b>upate:</b> This works
             fine on the polar clock example.
             <li>Creating a whole new visualistion (by going <code> var vis = new pv.Panel()</code>
-            and rendering to the same div as a previous render currently is
-            not good - this is to do with the underlying flash object not
-            cleaning up correctly.
-            <li>Text labels seem to have their vertical text-alignment 
-            default to something different to non-SVGWeb rendering. It
-            is likely easy to fix....<b>update:</b> A change has been implemented
-            to make the default text size look better, but it is likely
-            to need to be tweaked for text sizes larger than 10px.
+            and rendering to the same div as a previous render may not work.
+            This is to do with the underlying flash object not cleaning up correctly.
+            <li>Text labels with a text size different to the default
+            will have their vertical text-alignment be a little wrong. This is because
+            the flash SVG renderer doesn't understand the concept of 'em' for text
+            offsets.
             <li>The flash renderer is slower than native rendering, so
             frequent re-rendering of a graph will easily bog the browser
             down, and probably won't work (so don't try sub-1s re-rendering).
