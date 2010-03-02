@@ -1,5 +1,3 @@
-var guid = 0;
-
 pv.SvgScene.panel = function(scenes) {
   var g = scenes.$g, e = g && g.firstChild;
   for (var i = 0; i < scenes.length; i++) {
@@ -22,7 +20,6 @@ pv.SvgScene.panel = function(scenes) {
         g.setAttribute("fill", "none");
         g.setAttribute("stroke", "none");
         g.setAttribute("stroke-width", 1.5);
-        g.style.display = "inline-block";
 
         if (pv.renderer() == "svgweb") { // SVGWeb requires a separate mechanism for setting event listeners.
             // width/height can't be set on the fragment
@@ -39,6 +36,7 @@ pv.SvgScene.panel = function(scenes) {
                 this.addEventListener ('mouseout', pv.SvgScene.dispatch, true);
                 this.addEventListener ('mouseover', pv.SvgScene.dispatch, true);
                 this.addEventListener ('mousemove', pv.SvgScene.dispatch, true);
+                this.addEventListener ('mousewheel', pv.SvgScene.dispatch, true);
                 scenes.$g = this;
             }, false);
 
@@ -67,7 +65,7 @@ pv.SvgScene.panel = function(scenes) {
 
     /* clip (nest children) */
     if (s.overflow == "hidden") {
-      var id = (guid++).toString(36),
+      var id = (this.id++).toString(36),
           c = this.expect(e, "g", {"clip-path": "url(#" + id + ")"});
       if (!c.parentNode) g.appendChild(c);
       scenes.$g = g = c;

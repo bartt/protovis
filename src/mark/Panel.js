@@ -83,10 +83,23 @@ pv.Panel.prototype.type = "panel";
  */
 
 /**
- * TODO overflow documentation
+ * Specifies whether child marks are clipped when they overflow this panel.
+ * This affects the clipping of all this panel's descendant marks.
  *
  * @type string
  * @name pv.Panel.prototype.overflow
+ * @see http://www.w3.org/TR/CSS2/visufx.html#overflow
+ */
+
+/**
+ * The transform to be applied to child marks. The default transform is
+ * identity, which has no effect. Note that the panel's own fill and stroke are
+ * not affected by the transform, and panel's transform only affects the
+ * <tt>scale</tt> of child marks, not the panel itself.
+ *
+ * @type pv.Transform
+ * @name pv.Panel.prototype.transform
+ * @see pv.Mark.prototype.scale
  */
 
 /**
@@ -143,7 +156,7 @@ pv.Panel.prototype.add = function(type) {
   return child;
 };
 
-/** @private TODO */
+/** @private Bind this panel, then any child marks recursively. */
 pv.Panel.prototype.bind = function() {
   pv.Mark.prototype.bind.call(this);
   for (var i = 0; i < this.children.length; i++) {
@@ -164,9 +177,11 @@ pv.Panel.prototype.buildInstance = function(s) {
   if (!s.children) s.children = [];
 
   /*
-   * The default index should be cleared as we recurse into child marks. It will
-   * be reset to the current index when the next panel instance is built.
+   * Multiply the current scale factor by this panel's transform. Also clear the
+   * default index as we recurse into child marks; it will be reset to the
+   * current index when the next panel instance is built.
    */
+  var scale = this.scale * s.transform.k, child, n = this.children.length;
   pv.Mark.prototype.index = -1;
 
   /*
@@ -175,9 +190,11 @@ pv.Panel.prototype.buildInstance = function(s) {
    * existing scene graph, such that properties from the previous build can be
    * reused; this is largely to facilitate the recycling of SVG elements.
    */
-  for (var i = 0; i < this.children.length; i++) {
-    this.children[i].scene = s.children[i]; // possibly undefined
-    this.children[i].build();
+  for (var i = 0; i < n; i++) {
+    child = this.children[i];
+    child.scene = s.children[i]; // possibly undefined
+    child.scale = scale;
+    child.build();
   }
 
   /*
@@ -186,13 +203,15 @@ pv.Panel.prototype.buildInstance = function(s) {
    * remain on the child nodes because this panel (or a parent panel) may be
    * instantiated multiple times!
    */
-  for (var i = 0; i < this.children.length; i++) {
-    s.children[i] = this.children[i].scene;
-    delete this.children[i].scene;
+  for (var i = 0; i < n; i++) {
+    child = this.children[i];
+    s.children[i] = child.scene;
+    delete child.scene;
+    delete child.scale;
   }
 
-  /* Delete any expired child scenes, should child marks have been removed. */
-  s.children.length = this.children.length;
+  /* Delete any expired child scenes. */
+  s.children.length = n;
 };
 
 /**
@@ -244,27 +263,19 @@ pv.Panel.prototype.buildImplied = function(s) {
     } else {
       var cache = this.$canvas || (this.$canvas = []);
       if (!(c = cache[this.index])) {
-        c = cache[this.index] = document.createElement(pv.renderer() == "svgweb" ? "div" : "span"); // SVGWeb requires a div, not a span
-        this.$dom // script element for text/javascript+protovis
-            ? this.$dom.parentNode.insertBefore(c, this.$dom)
-            : lastElement().appendChild(c);
+        c = cache[this.index] =  document.createElement(pv.renderer() == "svgweb" ? "div" : "span"); // SVGWeb requires a div, not a span
+        if (this.$dom) { // script element for text/javascript+protovis
+          this.$dom.parentNode.insertBefore(c, this.$dom);
+        } else { // find the last element in the body
+          var n = document.body;
+          while (n.lastChild && n.lastChild.tagName) n = n.lastChild;
+          if (n != document.body) n = n.parentNode;
+          n.appendChild(c);
+        }
       }
     }
     s.canvas = c;
   }
   if (!s.transform) s.transform = pv.Transform.identity;
-  pv.Bar.prototype.buildImplied.call(this, s);
+  pv.Mark.prototype.buildImplied.call(this, s);
 };
-
-/**
- * @private Returns the last element in the current document's body. The canvas
- * element is appended to this last element if another DOM element has not
- * already been specified via the <tt>$dom</tt> field.
- */
-function lastElement() {
-  var node = document.body;
-  while (node.lastChild && node.lastChild.tagName) {
-    node = node.lastChild;
-  }
-  return (node == document.body) ? node : node.parentNode;
-}

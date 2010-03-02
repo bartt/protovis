@@ -20,6 +20,7 @@ pv.Dot = function() {
 
 pv.Dot.prototype = pv.extend(pv.Mark)
     .property("size", Number)
+    .property("radius", Number)
     .property("shape", String)
     .property("angle", Number)
     .property("lineWidth", Number)
@@ -192,12 +193,9 @@ pv.Dot.prototype.anchor = function(name) {
       });
 };
 
-/**
- * Returns the radius of the dot, which is defined to be the square root of the
- * {@link #size} property.
- *
- * @returns {number} the radius.
- */
-pv.Dot.prototype.radius = function() {
-  return Math.sqrt(this.size());
+/** @private Sets radius based on size or vice versa. */
+pv.Dot.prototype.buildImplied = function(s) {
+  if (s.radius == null) s.radius = Math.sqrt(s.size);
+  else if (s.size == null) s.size = s.radius * s.radius;
+  pv.Mark.prototype.buildImplied.call(this, s);
 };

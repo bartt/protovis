@@ -1,4 +1,4 @@
-data/Matrix.js
+data/Transform.js
 - documentation
 
 data/Scale.js
@@ -29,24 +29,14 @@ layout/Force.js
 layout/Treemap.js
 - use pv.Dom.Node
 
-layout/Stack.js
-- make class rather than property
-
 mark/Mark.js
-- standardize window.event access for event handlers?
 - antialias doesn't always work as expected; requires pixel rounding?
 - event("ignore") to disable pointer-events?
-- dot-dash strokes using stroke-dasharray
-
-mark/Panel.js
-- BUG: panel fill and stroke and not transformed
-- BUG: pv.SvgScene.scale is not set correctly if not rendered from root
-- overflow documentation
 
 behavior/*
 - documentation, implementation, etc.
-- pv.Mark.context to encapsulate item reference, evaluation state?
-- should pv.Behavior.{drag,transform} automatically redraw?
+- should behaviors automatically re-render?
+- pv.Behavior.point ... fuzzy mouseover
 
 physics/Simulation.js
 - use a constraint rather than `fixed` property to allow dragging?
@@ -54,12 +44,14 @@ physics/Simulation.js
 physics/LinkConstraint.js
 - should support an alpha parameter, like pv.Constraint.position
 
+scene/*
+- use array push rather than string concatentation to improve performance?
+
 text/CsvFormat.js
 - return an object with a .format method, or the format function?
 - should other Formats return a function with a self-reference .format method?
 
 *
-- remove all global variables, then remove pv-{start,end}.js
 - use Object.create instead of pv.extend, if available
 - use === and !== instead of == and !=
 - force type conversion of input arguments in public API?

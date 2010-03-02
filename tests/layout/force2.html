@@ -23,7 +23,6 @@ var vertices = pv.dom(diamond(3, 4, 4)).nodes(),
       });
 
 var graph = pv.Layout.force(vertices, edges),
-    transform = pv.Behavior.transform(),
     w = window.innerWidth,
     h = window.innerHeight;
 
@@ -32,8 +31,8 @@ var vis = new pv.Panel()
     .height(h)
     .fillStyle("white")
     .strokeStyle("#ccc")
-    .event("mousedown", transform.pan)
-    .event("mousewheel", transform.zoom);
+    .event("mousedown", pv.Behavior.pan())
+    .event("mousewheel", pv.Behavior.zoom());
 
 /* Links. */
 vis.add(pv.Panel)

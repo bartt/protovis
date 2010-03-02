@@ -241,6 +241,22 @@ pv.Mark.prototype.childIndex = -1;
 pv.Mark.prototype.index = -1;
 
 /**
+ * The current scale factor, based on any enclosing transforms. The current
+ * scale can be used to create scale-independent graphics. For example, to
+ * define a dot that has a radius of 10 irrespective of any zooming, say:
+ *
+ * <pre>dot.radius(function() 10 / this.scale)</pre>
+ *
+ * Note that the stroke width and font size are defined irrespective of scale
+ * (i.e., in screen space) already. Also note that when a transform is applied
+ * to a panel, the scale affects only the child marks, not the panel itself.
+ *
+ * @type number
+ * @see pv.Panel.prototype.transform
+ */
+pv.Mark.prototype.scale = 1;
+
+/**
  * The scene graph. The scene graph is an array of objects; each object (or
  * "node") corresponds to an instance of this mark and an element in the data
  * array. The scene graph can be traversed to lookup previously-evaluated
@@ -564,15 +580,10 @@ pv.Mark.prototype.cousin = function() {
  * a panel.
  */
 pv.Mark.prototype.render = function() {
-  if (!this.root.scene) {
-    /* For the first render, take it from the top. */
-    if (this.parent) {
-      this.root.render();
-      return;
-    }
-  } else {
-    /* Clear the data stack if called from an event handler. */
-    delete this.root.scene.data;
+  /* For the first render, take it from the top. */
+  if (!this.root.scene && this.parent) {
+    this.root.render();
+    return;
   }
 
   /**
@@ -587,67 +598,94 @@ pv.Mark.prototype.render = function() {
    * instance of the panel will be rendered; otherwise, all visible instances of
    * the mark will be rendered.
    */
-  var render = function(mark, depth) {
+  function render(mark, depth, scale) {
+    mark.scale = scale;
     if (depth < indexes.length) {
-      var childIndex = indexes[depth], child = mark.children[childIndex];
+      stack.unshift(null);
       if (mark.hasOwnProperty("index")) {
-        var i = mark.index;
-        if (mark.scene[i].visible) {
-          child.scene = mark.scene[i].children[childIndex];
-          render(child, depth + 1);
-        }
+        renderInstance(mark, depth, scale);
       } else {
-        for (var i = 0; i < mark.scene.length; i++) {
-          if (mark.scene[i].visible) {
-            mark.index = i;
-            child.scene = mark.scene[i].children[childIndex];
-            render(child, depth + 1);
-          }
+        for (var i = 0, n = mark.scene.length; i < n; i++) {
+          mark.index = i;
+          renderInstance(mark, depth, scale);
         }
         delete mark.index;
       }
-      delete child.scene;
-      return;
-    }
+      stack.shift();
+    } else {
+      mark.build();
 
-    /* Now that the scene stack is set, evaluate the properties. */
-    mark.build();
+      /*
+       * In the update phase, the scene is rendered by creating and updating
+       * elements and attributes in the SVG image. No properties are evaluated
+       * during the update phase; instead the values computed previously in the
+       * build phase are simply translated into SVG. The update phase is
+       * decoupled (see pv.Scene) to allow different rendering engines.
+       */
+      pv.Scene.scale = scale;
 
-    /*
-     * In the update phase, the scene is rendered by creating and updating
-     * elements and attributes in the SVG image. No properties are evaluated
-     * during the update phase; instead the values computed previously in the
-     * build phase are simply translated into SVG. The update phase is decoupled
-     * (see pv.Scene) to allow different rendering engines.
-     */
-    var id = null;
-    if (mark.scene && mark.scene.$g && mark.scene.$g.suspendRedraw)
+      var id = null; // SVGWeb performance enhancement. 
+      if (mark.scene && mark.scene.$g && mark.scene.$g.suspendRedraw)
         id = mark.scene.$g.suspendRedraw(1000);
-    pv.Scene.updateAll(mark.scene);
-    if (id)
-        mark.scene.$g.unsuspendRedraw(id);
 
-    delete mark.root.scene.data;
+      pv.Scene.updateAll(mark.scene);
+
+      if (id) // SVGWeb performance enhancement. 
+          mark.scene.$g.unsuspendRedraw(id);
+    }
+    delete mark.scale;
+  }
+
+  /**
+   * @private Recursively renders the current instance of the specified mark.
+   * This is slightly tricky because `index` and `scene` properties may or may
+   * not already be set; if they are set, it means we are rendering only a
+   * specific instance; if they are unset, we are rendering all instances.
+   * Furthermore, we must preserve the original context of these properties when
+   * rendering completes.
+   *
+   * <p>Another tricky aspect is that the `scene` attribute should be set for
+   * any preceding children, so as to allow property chaining. This is
+   * consistent with first-pass rendering.
+   */
+  function renderInstance(mark, depth, scale) {
+    var s = mark.scene[mark.index], i;
+    if (s.visible) {
+      var childIndex = indexes[depth], child = mark.children[childIndex];
+
+      /* Set preceding child scenes. */
+      for (i = 0; i < childIndex; i++) {
+        mark.children[i].scene = s.children[i];
+      }
+
+      /* Set current child scene, if necessary. */
+      stack[0] = s.data;
+      if (child.scene) {
+        render(child, depth + 1, scale * s.transform.k);
+      } else {
+        child.scene = s.children[childIndex];
+        render(child, depth + 1, scale * s.transform.k);
+        delete child.scene;
+      }
+
+      /* Clear preceding child scenes. */
+      for (i = 0; i < childIndex; i++) {
+        delete mark.children[i].scene;
+      }
+    }
   }
 
   /* Bind this mark's property definitions. */
   this.bind();
 
   /* Recursively render all instances of this mark. */
-  var indexes = [];
+  var stack = pv.Mark.stack, indexes = [];
   for (var m = this; m.parent; m = m.parent) indexes.unshift(m.childIndex);
-  render(this.root, 0);
+  render(this.root, 0, 1);
 };
 
-/** @private Computes the root data stack for the specified mark. */
-function argv(mark) {
-  var stack = [];
-  while (mark) {
-    stack.push(mark.scene[mark.index].data);
-    mark = mark.parent;
-  }
-  return stack;
-}
+/** @private Stores the current data stack. */
+pv.Mark.stack = [];
 
 /**
  * @private In the bind phase, inherited property definitions are cached so they
@@ -656,7 +694,7 @@ function argv(mark) {
 pv.Mark.prototype.bind = function() {
   var seen = {}, types = [[], [], [], []], data, visible;
 
-  /** TODO */
+  /** Scans the proto chain for the specified mark. */
   function bind(mark) {
     do {
       var properties = mark.$properties;
@@ -674,7 +712,7 @@ pv.Mark.prototype.bind = function() {
     } while (mark = mark.proto);
   }
 
-  /** TODO */
+  /** Returns a def setter-getter for the specified property. */
   function def(name) {
     return function(v) {
       var defs = this.scene.defs;
@@ -759,7 +797,7 @@ pv.Mark.prototype.bind = function() {
  * @param parent the instance of the parent panel from the scene graph.
  */
 pv.Mark.prototype.build = function() {
-  var scene = this.scene;
+  var scene = this.scene, stack = pv.Mark.stack;
   if (!scene) {
     scene = this.scene = [];
     scene.mark = this;
@@ -771,10 +809,6 @@ pv.Mark.prototype.build = function() {
     }
   }
 
-  /* Set the data stack. */
-  var stack = this.root.scene.data;
-  if (!stack) this.root.scene.data = stack = argv(this.parent);
-
   /* Evaluate defs. */
   if (this.binds.defs.length) {
     var defs = scene.defs;
@@ -782,12 +816,9 @@ pv.Mark.prototype.build = function() {
     for (var i = 0; i < this.binds.defs.length; i++) {
       var d = this.binds.defs[i];
       if (!(d.name in defs.locked)) {
-        var v = d.value;
-        if (d.type == 1) {
-          property = d.name;
-          v = v.apply(this, stack);
-        }
-        defs.values[d.name] = v;
+        defs.values[d.name] = d.type == 1
+            ? d.value.apply(this, stack)
+            : d.value;
       }
     }
   }
@@ -795,16 +826,14 @@ pv.Mark.prototype.build = function() {
   /* Evaluate special data property. */
   var data = this.binds.data;
   switch (data.type) {
-    case 0: case 1: data = defs.values.data; break;
+    case 0:
+    case 1: data = defs.values.data; break;
     case 2: data = data.value; break;
-    case 3: {
-      property = "data";
-      data = data.value.apply(this, stack);
-      break;
-    }
+    case 3: data = data.value.apply(this, stack); break;
   }
 
   /* Create, update and delete scene nodes. */
+  var index = this.index;
   stack.unshift(null);
   scene.length = data.length;
   for (var i = 0; i < data.length; i++) {
@@ -814,10 +843,12 @@ pv.Mark.prototype.build = function() {
     s.data = stack[0] = data[i];
     this.buildInstance(s);
   }
-  stack.shift();
-  delete this.index;
   pv.Mark.prototype.index = -1;
-  if (!this.parent) scene.data = null;
+  stack.shift();
+
+  /* Restore the old index, if any. */
+  if (index != -1) this.index = index;
+  else delete this.index;
 
   return this;
 };
@@ -833,12 +864,9 @@ pv.Mark.prototype.buildProperties = function(s, properties) {
   for (var i = 0, n = properties.length; i < n; i++) {
     var p = properties[i], v = p.value; // assume case 2 (constant)
     switch (p.type) {
-      case 0: case 1: v = this.scene.defs.values[p.name]; break;
-      case 3: {
-        property = p.name;
-        v = v.apply(this, this.root.scene.data);
-        break;
-      }
+      case 0:
+      case 1: v = this.scene.defs.values[p.name]; break;
+      case 3: v = v.apply(this, pv.Mark.stack); break;
     }
     s[p.name] = v;
   }
@@ -923,16 +951,6 @@ pv.Mark.prototype.buildImplied = function(s) {
 };
 
 /**
- * @private The name of the property being evaluated, for so-called "smart"
- * functions that change behavior depending on which property is being
- * evaluated. This functionality is somewhat magical, so for now, this feature
- * is not exposed outside the library.
- *
- * @type string
- */
-var property;
-
-/**
  * Returns the current location of the mouse (cursor) relative to this mark's
  * parent. The <i>x</i> coordinate corresponds to the left margin, while the
  * <i>y</i> coordinate corresponds to the top margin.
@@ -1014,10 +1032,69 @@ pv.Mark.prototype.event = function(type, handler) {
   return this;
 };
 
-/** @private TODO */
-pv.Mark.prototype.dispatch = function(e, scenes, index) {
+/** @private Evaluates the function <i>f</i> with the specified context. */
+pv.Mark.context = function(scenes, index, f) {
+  var that = scenes.mark,
+      stack = pv.Mark.stack,
+      proto = pv.Mark.prototype,
+      ancestors = [],
+      mark = that;
 
-  var l = this.$handlers && this.$handlers[e.type];
+  /* Set the default index. */
+  proto.index = index;
+
+  /* Set ancestors' scene and index; populate data stack. */
+  do {
+    ancestors.push(mark);
+    stack.push(scenes[index].data);
+    mark.index = index;
+    mark.scene = scenes;
+    index = scenes.parentIndex;
+    scenes = scenes.parent;
+  } while (mark = mark.parent);
+
+  /* Set ancestors' scale; requires top-down. */
+  for (var i = ancestors.length - 1, k = 1; i > 0; i--) {
+    mark = ancestors[i];
+    mark.scale = k *= mark.scene[mark.index].transform.k;
+  }
+
+  /* Set children's scene and scale. */
+  if (that.children) for (var i = 0, n = that.children.length; i < n; i++) {
+    mark = that.children[i];
+    mark.scene = that.scene[that.index].children[i];
+    mark.scale = k;
+  }
+
+  /* Invoke the given function. */
+  try {
+    f.apply(that, stack);
+  } finally {
+    proto.index = -1;
+
+    /* Reset children. */
+    if (that.children) for (var i = 0, n = that.children.length; i < n; i++) {
+      mark = that.children[i];
+      delete mark.scene;
+      delete mark.scale;
+    }
+
+    /* Reset ancestors. */
+    mark = that;
+    do {
+      stack.pop();
+      if (mark.parent) {
+        delete mark.scene;
+        delete mark.scale;
+      }
+      delete mark.index;
+    } while (mark = mark.parent);
+  }
+};
+
+/** @private Execute the event listener, then re-render. */
+pv.Mark.dispatch = function(e, scenes, index) {
+  var m = scenes.mark, p = scenes.parent, l = m.$handlers && m.$handlers[e.type];
 
   if (pv.renderer() == 'svgweb' && e.type != 'mousemove') {
     // In SVGWeb, when nodes are rerendered, the re-render
@@ -1040,35 +1117,10 @@ pv.Mark.prototype.dispatch = function(e, scenes, index) {
     if (e.type == 'mouseout') this.lastDispatchLog['mouseover'] = null;
   }
 
-  if (!l) return this.parent
-      && this.parent.dispatch(e, scenes.parent, scenes.parentIndex);
-
-  try {
-    /* Setup the scene stack. */
-    var mark = this;
-    do {
-      mark.index = index;
-      mark.scene = scenes;
-      index = scenes.parentIndex;
-      scenes = scenes.parent;
-    } while (mark = mark.parent);
-
-    /* Execute the event listener. */
-    try {
-      mark = l.apply(this, this.root.scene.data = argv(this));
-    } finally {
+  if (!l) return p && pv.Mark.dispatch(e, p, scenes.parentIndex);
+  pv.Mark.context(scenes, index, function() {
+      m = l.apply(m, pv.Mark.stack);
+      if (m && m.render) m.render();
       e.preventDefault();
-      this.root.scene.data = null;
-    }
-
-    /* Update the display. TODO dirtying. */
-    if (mark instanceof pv.Mark) mark.render();
-  } finally {
-    /* Restore the scene stack. */
-    var mark = this;
-    do {
-      if (mark.parent) delete mark.scene;
-      delete mark.index;
-    } while (mark = mark.parent);
-  }
+    });
 };

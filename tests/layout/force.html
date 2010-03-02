@@ -18,7 +18,6 @@ body {
     <script type="text/javascript+protovis">
 
 var graph = pv.Layout.force(miserables.vertices, miserables.edges),
-    transform = pv.Behavior.transform(),
     w = window.innerWidth,
     h = window.innerHeight;
 
@@ -27,8 +26,8 @@ var vis = new pv.Panel()
     .height(h)
     .fillStyle("white")
     .strokeStyle("#ccc")
-    .event("mousedown", transform.pan)
-    .event("mousewheel", transform.zoom);
+    .event("mousedown", pv.Behavior.pan())
+    .event("mousewheel", pv.Behavior.zoom());
 
 /* Links. */
 vis.add(pv.Panel)
@@ -39,7 +38,7 @@ vis.add(pv.Panel)
 /* Nodes. */
 vis.add(pv.Dot)
     .extend(graph.node)
-    .size(function(d) d.linkDegree + 4)
+    .size(function(d) (d.linkDegree + 4) * Math.pow(this.scale, -1.5))
     .fillStyle(function(d) d.fixed ? "orange" : "white")
     .title(function(d) d.nodeValue)
     .event("mousedown", pv.Behavior.drag());
