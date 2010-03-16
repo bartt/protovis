@@ -22,6 +22,7 @@ JS_PV_FILES = \
 	src/data/LinearScale.js \
 	src/data/LogScale.js \
 	src/data/OrdinalScale.js \
+	src/data/Histogram.js \
 	src/color/Color.js \
 	src/color/Colors.js \
 	src/color/Ramp.js \
@@ -57,7 +58,10 @@ JS_PV_FILES = \
 	src/physics/CollisionConstraint.js \
 	src/physics/LinkConstraint.js \
 	src/physics/PositionConstraint.js \
+	src/physics/BoundConstraint.js \
 	src/layout/Layout.js \
+	src/layout/Network.js \
+	src/layout/Hierarchy.js \
 	src/layout/Grid.js \
 	src/layout/Stack.js \
 	src/layout/Treemap.js \
@@ -68,8 +72,11 @@ JS_PV_FILES = \
 	src/layout/Cluster.js \
 	src/layout/Partition.js \
 	src/layout/Arc.js \
+	src/layout/Horizon.js \
+	src/layout/Rollup.js \
 	src/behavior/Behavior.js \
 	src/behavior/Drag.js \
+	src/behavior/Point.js \
 	src/behavior/Select.js \
 	src/behavior/Pan.js \
 	src/behavior/Zoom.js

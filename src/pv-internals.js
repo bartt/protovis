@@ -39,10 +39,10 @@ try {
  * @returns {string} a conformant JavaScript 1.6 source code.
  */
   pv.parse = function(js) { // hacky regex support
-    var re = new RegExp("function(\\s+\\w+)?\\([^)]*\\)\\s*", "mg"), m, d, i = 0, s = "";
+    var re = new RegExp("function\\s*(\\b\\w+)?\\s*\\([^)]*\\)\\s*", "mg"), m, d, i = 0, s = "";
     while (m = re.exec(js)) {
       var j = m.index + m[0].length;
-      if (js.charAt(j--) != '{') {
+      if (js.charAt(j) != '{') {
         s += js.substring(i, j) + "{return ";
         i = j;
         for (var p = 0; p >= 0 && j < js.length; j++) {
@@ -166,3 +166,8 @@ pv.listenForPageLoad = function(listener) {
 pv.renderer = function() {
     return (typeof window.svgweb === "undefined") ? "nativesvg" : "svgweb";
 }
+
+/** @private Returns a locally-unique positive id. */
+pv.id = function() {
+  var id = 1; return function() { return id++; };
+}();

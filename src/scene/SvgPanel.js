@@ -65,7 +65,7 @@ pv.SvgScene.panel = function(scenes) {
 
     /* clip (nest children) */
     if (s.overflow == "hidden") {
-      var id = (this.id++).toString(36),
+      var id = pv.id().toString(36),
           c = this.expect(e, "g", {"clip-path": "url(#" + id + ")"});
       if (!c.parentNode) g.appendChild(c);
       scenes.$g = g = c;
@@ -119,9 +119,10 @@ pv.SvgScene.panel = function(scenes) {
 
 pv.SvgScene.fill = function(e, scenes, i) {
   var s = scenes[i], fill = s.fillStyle;
-  if (fill.opacity) {
+  if (fill.opacity || s.events == "all") {
     e = this.expect(e, "rect", {
         "shape-rendering": s.antialias ? null : "crispEdges",
+        "pointer-events": s.events,
         "cursor": s.cursor,
         "x": s.left,
         "y": s.top,
@@ -138,9 +139,10 @@ pv.SvgScene.fill = function(e, scenes, i) {
 
 pv.SvgScene.stroke = function(e, scenes, i) {
   var s = scenes[i], stroke = s.strokeStyle;
-  if (stroke.opacity) {
+  if (stroke.opacity || s.events == "all") {
     e = this.expect(e, "rect", {
         "shape-rendering": s.antialias ? null : "crispEdges",
+        "pointer-events": s.events == "all" ? "stroke" : s.events,
         "cursor": s.cursor,
         "x": s.left,
         "y": s.top,

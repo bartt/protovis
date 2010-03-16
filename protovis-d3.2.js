@@ -1,4 +1,4 @@
-// 64009005d5cfba8f302289e6e14d56f93f6a46c7
+// d1c5314ae16ab7914be281ae3989820f94e02bbe
 /**
  * @class The built-in Array class.
  * @name Array
@@ -239,10 +239,10 @@ try {
  * @returns {string} a conformant JavaScript 1.6 source code.
  */
   pv.parse = function(js) { // hacky regex support
-    var re = new RegExp("function(\\s+\\w+)?\\([^)]*\\)\\s*", "mg"), m, d, i = 0, s = "";
+    var re = new RegExp("function\\s*(\\b\\w+)?\\s*\\([^)]*\\)\\s*", "mg"), m, d, i = 0, s = "";
     while (m = re.exec(js)) {
       var j = m.index + m[0].length;
-      if (js.charAt(j--) != '{') {
+      if (js.charAt(j) != '{') {
         s += js.substring(i, j) + "{return ";
         i = j;
         for (var p = 0; p >= 0 && j < js.length; j++) {
@@ -366,6 +366,15 @@ pv.listenForPageLoad = function(listener) {
 pv.renderer = function() {
     return (typeof window.svgweb === "undefined") ? "nativesvg" : "svgweb";
 }
+
+/** @private Returns a locally-unique positive id. */
+pv.id = function() {
+  var id = 1; return function() { return id++; };
+}();
+/**
+ * @ignore
+ * @class
+ */
 pv.Format = {};
 
 /**
@@ -376,34 +385,23 @@ pv.Format = {};
  * @param {string} s a string to quote.
  * @returns {string} the quoted string.
  */
-function re_quote(s) {
+pv.Format.re = function(s) {
   return s.replace(/[\\\^\$\*\+\?\[\]\(\)\.\{\}]/g, "\\$&");
-}
-/**
- * Returns a padding function with the specified pad character <i>c</i> and
- * length <i>n</i>.
- *
- * @param {string} c a padding character, such as "0".
- * @param {number} n the padding length, such as 2.
- * @returns {function} a padding function.
- */
-pv.Format.pad = function(c, n) {
-  var cache = pv.Format.pad.$cache;
-  return function(s) {
-      s = String(s);
-      var m = n - s.length;
-      return (m < 1)
-          ? s // the string is already long enough
-          : ((cache[m] || (cache[m] = new Array(m + 1))).join(c) + s);
-    };
 };
 
-pv.Format.pad.$cache = [];
-
-/* Various padders used internally. */
-var padz2 = pv.Format.pad("0", 2),
-    padz3 = pv.Format.pad("0", 3),
-    pads2 = pv.Format.pad(" ", 2);
+/**
+ * @private Optionally pads the specified string <i>s</i> so that it is at least
+ * <i>n</i> characters long, using the padding character <i>c</i>.
+ *
+ * @param {string} c the padding character.
+ * @param {number} n the minimum string length.
+ * @param {string} s the string to pad.
+ * @returns {string} the padded string.
+ */
+pv.Format.pad = function(c, n, s) {
+  var m = n - String(s).length;
+  return (m < 1) ? s : new Array(m + 1).join(c) + s;
+};
 /**
  * The format string is in the same format expected by the <tt>strftime</tt>
  * function in C. The following conversion specifications are supported:<ul>
@@ -474,6 +472,7 @@ var padz2 = pv.Format.pad("0", 2),
  * documentation.
  */
 pv.Format.date = function(pattern) {
+  var pad = pv.Format.pad;
 
   /**
    * Converts a date to a string using the associated formatting pattern.
@@ -501,35 +500,35 @@ pv.Format.date = function(pattern) {
               "August", "September", "October", "November", "December"
             ][d.getMonth()];
           case '%c': return d.toLocaleString();
-          case '%C': return padz2(Math.floor(d.getFullYear() / 100) % 100);
-          case '%d': return padz2(d.getDate());
+          case '%C': return pad("0", 2, Math.floor(d.getFullYear() / 100) % 100);
+          case '%d': return pad("0", 2, d.getDate());
           case '%x':
-          case '%D': return padz2(d.getMonth() + 1)
-                    + "/" + padz2(d.getDate())
-                    + "/" + padz2(d.getFullYear() % 100);
-          case '%e': return pads2(d.getDate());
-          case '%H': return padz2(d.getHours());
+          case '%D': return pad("0", 2, d.getMonth() + 1)
+                    + "/" + pad("0", 2, d.getDate())
+                    + "/" + pad("0", 2, d.getFullYear() % 100);
+          case '%e': return pad(" ", 2, d.getDate());
+          case '%H': return pad("0", 2, d.getHours());
           case '%I': {
             var h = d.getHours() % 12;
-            return h ? padz2(h) : 12;
+            return h ? pad("0", 2, h) : 12;
           }
           // TODO %j: day of year as a decimal number [001,366]
-          case '%m': return padz2(d.getMonth() + 1);
-          case '%M': return padz2(d.getMinutes());
+          case '%m': return pad("0", 2, d.getMonth() + 1);
+          case '%M': return pad("0", 2, d.getMinutes());
           case '%n': return "\n";
           case '%p': return d.getHours() < 12 ? "AM" : "PM";
           case '%T':
           case '%X':
           case '%r': {
             var h = d.getHours() % 12;
-            return (h ? padz2(h) : 12)
-                    + ":" + padz2(d.getMinutes())
-                    + ":" + padz2(d.getSeconds())
+            return (h ? pad("0", 2, h) : 12)
+                    + ":" + pad("0", 2, d.getMinutes())
+                    + ":" + pad("0", 2, d.getSeconds())
                     + " " + (d.getHours() < 12 ? "AM" : "PM");
           }
-          case '%R': return padz2(d.getHours()) + ":" + padz2(d.getMinutes());
-          case '%S': return padz2(d.getSeconds());
-          case '%Q': return padz3(d.getMilliseconds());
+          case '%R': return pad("0", 2, d.getHours()) + ":" + pad("0", 2, d.getMinutes());
+          case '%S': return pad("0", 2, d.getSeconds());
+          case '%Q': return pad("0", 3, d.getMilliseconds());
           case '%t': return "\t";
           case '%u': {
             var w = d.getDay();
@@ -539,7 +538,7 @@ pv.Format.date = function(pattern) {
           // TODO %V: week number (monday first day) [01,53] ... with weirdness
           case '%w': return d.getDay();
           // TODO %W: week number (monday first day) [00,53] ... with weirdness
-          case '%y': return padz2(d.getFullYear() % 100);
+          case '%y': return pad("0", 2, d.getFullYear() % 100);
           case '%Y': return d.getFullYear();
           // TODO %Z: timezone name or abbreviation
           case '%%': return "%";
@@ -560,7 +559,7 @@ pv.Format.date = function(pattern) {
     var fields = [function() {}];
 
     /* Register callbacks for each field in the format pattern. */
-    var re = re_quote(pattern).replace(/%[a-zA-Z0-9]/g, function(s) {
+    var re = pv.Format.re(pattern).replace(/%[a-zA-Z0-9]/g, function(s) {
         switch (s) {
           // TODO %a: day of week, either abbreviated or full name
           // TODO %A: same as %a
@@ -655,6 +654,7 @@ pv.Format.date = function(pattern) {
   return format;
 };
 pv.Format.time = function(type) {
+  var pad = pv.Format.pad;
 
   /*
    * MILLISECONDS = 1
@@ -689,12 +689,12 @@ pv.Format.time = function(type) {
         var a = [],
             s = ((t % 6e4) / 1e3) >> 0,
             m = ((t % 36e5) / 6e4) >> 0;
-        a.push(padz2(s));
+        a.push(pad("0", 2, s));
         if (t >= 36e5) {
           var h = ((t % 864e5) / 36e5) >> 0;
-          a.push(padz2(m));
+          a.push(pad("0", 2, m));
           if (t >= 864e5) {
-            a.push(padz2(h));
+            a.push(pad("0", 2, h));
             a.push(Math.floor(t / 864e5).toFixed());
           } else {
             a.push(h.toFixed());
@@ -796,14 +796,16 @@ pv.Format.number = function() {
    * @returns {number} the parsed number.
    */
   format.parse = function(x) {
+    var re = pv.Format.re;
+
     /* Remove leading and trailing padding. Split on the decimal separator. */
     var s = String(x)
-        .replace(new RegExp("^(" + re_quote(padi) + ")*"), "")
-        .replace(new RegExp("(" + re_quote(padf) + ")*$"), "")
+        .replace(new RegExp("^(" + re(padi) + ")*"), "")
+        .replace(new RegExp("(" + re(padf) + ")*$"), "")
         .split(decimal);
 
     /* Remove grouping and truncate the integral part. */
-    var i = s[0].replace(new RegExp(re_quote(group), "g"), "");
+    var i = s[0].replace(new RegExp(re(group), "g"), "");
     if (i.length > maxi) i = i.substring(i.length - maxi);
 
     /* Round the fractional part. */
@@ -1082,7 +1084,7 @@ pv.CsvFormat.quote = function(s) {
  * @private A private variant of Array.prototype.map that supports the index
  * property.
  */
-function map(array, f) {
+pv.map = function(array, f) {
   var o = {};
   return f
       ? array.map(function(d, i) { o.index = i; return f.call(o, d); })
@@ -1211,7 +1213,7 @@ pv.transpose = function(arrays) {
  * @returns {number[]} an array of numbers that sums to one.
  */
 pv.normalize = function(array, f) {
-  var norm = map(array, f), sum = pv.sum(norm);
+  var norm = pv.map(array, f), sum = pv.sum(norm);
   for (var i = 0; i < norm.length; i++) norm[i] /= sum;
   return norm;
 };
@@ -1421,7 +1423,7 @@ pv.sum = function(array, f) {
  */
 pv.max = function(array, f) {
   if (f == pv.index) return array.length - 1;
-  return Math.max.apply(null, f ? map(array, f) : array);
+  return Math.max.apply(null, f ? pv.map(array, f) : array);
 };
 
 /**
@@ -1462,7 +1464,7 @@ pv.max.index = function(array, f) {
  */
 pv.min = function(array, f) {
   if (f == pv.index) return 0;
-  return Math.min.apply(null, f ? map(array, f) : array);
+  return Math.min.apply(null, f ? pv.map(array, f) : array);
 };
 
 /**
@@ -1518,7 +1520,7 @@ pv.mean = function(array, f) {
  */
 pv.median = function(array, f) {
   if (f == pv.index) return (array.length - 1) / 2;
-  array = map(array, f).sort(pv.naturalOrder);
+  array = pv.map(array, f).sort(pv.naturalOrder);
   if (array.length % 2) return array[Math.floor(array.length / 2)];
   var i = array.length / 2;
   return (array[i - 1] + array[i]) / 2;
@@ -1765,9 +1767,10 @@ pv.Dom.prototype.leaf = function(f) {
  * Applies the DOM operator, returning the root node.
  *
  * @returns {pv.Dom.Node} the root node.
+ * @param {string} [nodeName] optional node name for the root.
  */
-pv.Dom.prototype.root = function() {
-  var leaf = this.$leaf;
+pv.Dom.prototype.root = function(nodeName) {
+  var leaf = this.$leaf, root = recurse(this.$map);
 
   /** @private */
   function recurse(map) {
@@ -1779,7 +1782,8 @@ pv.Dom.prototype.root = function() {
     return n;
   }
 
-  return recurse(this.$map);
+  root.nodeName = nodeName;
+  return root;
 };
 
 /**
@@ -1789,16 +1793,7 @@ pv.Dom.prototype.root = function() {
  * @returns {array} the array of nodes in preorder traversal.
  */
 pv.Dom.prototype.nodes = function() {
-  var array = [];
-
-  /** @private */
-  function flatten(node) {
-    array.push(node);
-    node.childNodes.forEach(flatten);
-  }
-
-  flatten(this.root(), array);
-  return array;
+  return this.root().nodes();
 };
 
 /**
@@ -2007,6 +2002,7 @@ pv.Dom.Node.prototype.visitAfter = function(f) {
  * sort operation.
  *
  * @param {function} f a comparator function.
+ * @returns this
  */
 pv.Dom.Node.prototype.sort = function(f) {
   if (this.firstChild) {
@@ -2022,6 +2018,40 @@ pv.Dom.Node.prototype.sort = function(f) {
     this.lastChild = p;
     delete p.nextSibling;
     p.sort(f);
+  }
+  return this;
+};
+
+/** Returns all descendants of this node in preorder traversal. */
+pv.Dom.Node.prototype.nodes = function() {
+  var array = [];
+
+  /** @private */
+  function flatten(node) {
+    array.push(node);
+    node.childNodes.forEach(flatten);
+  }
+
+  flatten(this, array);
+  return array;
+};
+
+/**
+ * Toggles the child nodes of this node. If this node is not yet toggled, this
+ * method removes all child nodes and appends them to a new <tt>toggled</tt>
+ * array attribute on this node. Otherwise, if this node is toggled, this method
+ * re-adds all toggled child nodes and deletes the <tt>toggled</tt> attribute.
+ *
+ * <p>This method has no effect if the node has no child nodes.
+ */
+pv.Dom.Node.prototype.toggle = function() {
+  var n = this;
+  if (n.toggled) {
+    for (var c; c = n.toggled.pop();) n.appendChild(c);
+    delete n.toggled;
+  } else if (n.lastChild) {
+    n.toggled = [];
+    while (n.lastChild) n.toggled.push(n.removeChild(n.lastChild));
   }
 };
 /**
@@ -2937,12 +2967,15 @@ pv.Scale.linear = function() {
    *
    * @function
    * @name pv.Scale.linear.prototype.ticks
+   * @param {number} [m] optional number of desired ticks.
    * @returns {number[]} an array input domain values to use as ticks.
    */
-  scale.ticks = function() {
+  scale.ticks = function(m) {
     var min = d[0],
         max = d[d.length - 1],
         span = max - min;
+
+    if (!arguments.length) m = 10;
 
     /* Special case: dates. */
     if (type == newDate) {
@@ -3028,7 +3061,7 @@ pv.Scale.linear = function() {
           }
           default: {
             step = pv.logCeil(n / 15, 10);
-            if (n / step < 2) step /= 2;
+            if (n / step < 2) step /= 5;
             else if (n / step < 5) step /= 2;
             date.setFullYear(Math.floor(date.getFullYear() / step) * step);
             break;
@@ -3047,9 +3080,11 @@ pv.Scale.linear = function() {
     }
 
     /* Normal case: numbers. */
-    var step = pv.logCeil(span / 15, 10);
-    if (span / step < 2) step /= 5;
-    else if (span / step < 5) step /= 2;
+    var step = pv.logFloor(span / m, 10),
+        err = m / (span / step);
+    if (err <= .15) step *= 10;
+    else if (err <= .35) step *= 5;
+    else if (err <= .75) step *= 2;
     var start = Math.ceil(min / step) * step,
         end = Math.floor(max / step) * step,
         precision = Math.max(0, -Math.floor(pv.log(step, 10) + .01));
@@ -3534,7 +3569,7 @@ pv.Scale.ordinal = function() {
   scale.domain = function(array, f) {
     if (arguments.length) {
       array = (array instanceof Array)
-          ? ((arguments.length > 1) ? map(array, f) : array)
+          ? ((arguments.length > 1) ? pv.map(array, f) : array)
           : Array.prototype.slice.call(arguments);
 
       /* Filter the specified ordinals to their unique values. */
@@ -3583,7 +3618,7 @@ pv.Scale.ordinal = function() {
   scale.range = function(array, f) {
     if (arguments.length) {
       r = (array instanceof Array)
-          ? ((arguments.length > 1) ? map(array, f) : array)
+          ? ((arguments.length > 1) ? pv.map(array, f) : array)
           : Array.prototype.slice.call(arguments);
       if (typeof r[0] == "string") r = r.map(pv.color);
       return this;
@@ -3706,6 +3741,49 @@ pv.Scale.ordinal = function() {
 
   scale.domain.apply(scale, arguments);
   return scale;
+};
+/** Returns a histogram generator for the specified data. */
+pv.histogram = function(data, f) {
+  var frequency = true;
+  return {
+    bins: function(ticks) {
+      var x = pv.map(data, f), bins = [];
+
+      /* Initialize default ticks. */
+      if (!arguments.length) ticks = pv.Scale.linear(x).ticks();
+
+      /* Initialize the bins. */
+      for (var i = 0; i < ticks.length - 1; i++) {
+        var bin = bins[i] = [];
+        bin.x = ticks[i];
+        bin.dx = ticks[i + 1] - ticks[i];
+        bin.y = 0;
+      }
+
+      /* Count the number of samples per bin. */
+      for (var i = 0; i < x.length; i++) {
+        var j = pv.search.index(ticks, x[i]) - 1,
+            bin = bins[Math.max(0, Math.min(bins.length - 1, j))];
+        bin.y++;
+        bin.push(data[i]);
+      }
+
+      /* Convert frequencies to probabilities. */
+      if (!frequency) for (var i = 0; i < bins.length; i++) {
+        bins[i].y /= x.length;
+      }
+
+      return bins;
+    },
+
+    frequency: function(x) {
+      if (arguments.length) {
+        frequency = Boolean(x);
+        return this;
+      }
+      return frequency;
+    }
+  };
 };
 /**
  * Returns the {@link pv.Color} for the specified color format string. Colors
@@ -4452,41 +4530,39 @@ pv.ramp = function(start, end) {
   return scale;
 };
 /**
- * @private Namespace constants for SVG, XMLNS, and XLINK.
- *
- * @namespace Namespace constants for SVG, XMLNS, and XLINK.
- */
-var ns = {
-  /**
-   * The SVG namespace, "http://www.w3.org/2000/svg".
-   *
-   * @type string
-   * @constant
-   */
-  svg: "http://www.w3.org/2000/svg",
-
-  /**
-   * The XMLNS namespace, "http://www.w3.org/2000/xmlns".
-   *
-   * @type string
-   * @constant
-   */
-  xmlns: "http://www.w3.org/2000/xmlns",
-
-  /**
-   * The XLINK namespace, "http://www.w3.org/1999/xlink".
-   *
-   * @type string
-   * @constant
-   */
-  xlink: "http://www.w3.org/1999/xlink"
-};
-
-/**
  * @private
  * @namespace
  */
-pv.Scene = pv.SvgScene = {};
+pv.Scene = pv.SvgScene = {
+  /* Various namespaces. */
+  svg: "http://www.w3.org/2000/svg",
+  xmlns: "http://www.w3.org/2000/xmlns",
+  xlink: "http://www.w3.org/1999/xlink",
+
+  /** The pre-multipled scale, based on any enclosing transforms. */
+  scale: 1,
+
+  /** Implicit values for SVG and CSS properties. */
+  implicit: {
+    svg: {
+      "shape-rendering": "auto",
+      "pointer-events": "painted",
+      "x": 0,
+      "y": 0,
+      "dy": 0,
+      "text-anchor": "start",
+      "transform": "translate(0,0)",
+      "fill": "none",
+      "fill-opacity": 1,
+      "stroke": "none",
+      "stroke-opacity": 1,
+      "stroke-width": 1.5
+    },
+    css: {
+      "font": "10px sans-serif"
+    }
+  }
+};
 
 /**
  * Updates the display for the specified array of scene nodes.
@@ -4494,9 +4570,8 @@ pv.Scene = pv.SvgScene = {};
  * @param scenes {array} an array of scene nodes.
  */
 pv.SvgScene.updateAll = function(scenes) {
-  /* TODO setup transform if not rendering on the root panel */
-  if (!scenes.length) return;
-  if ((scenes[0].reverse)
+  if (scenes.length
+      && scenes[0].reverse
       && (scenes.type != "line")
       && (scenes.type != "area")) {
     var reversed = pv.extend(scenes);
@@ -4515,7 +4590,7 @@ pv.SvgScene.updateAll = function(scenes) {
  * @returns a new SVG element.
  */
 pv.SvgScene.create = function(type) {
-  return document.createElementNS(ns.svg, type);
+  return document.createElementNS(this.svg, type);
 };
 
 /**
@@ -4553,7 +4628,7 @@ pv.SvgScene.expect = function(e, type, attributes, style) {
         if (pv.renderer() != 'svgweb') // svgweb doesn't support removeproperty TODO SVGWEB
             e.style.removeProperty(name);
     }
-    else e.style.setProperty(name, value);
+    else e.style[name] = value;
   }
   return e;
 };
@@ -4590,7 +4665,7 @@ pv.SvgScene.title = function(e, s) {
     // Set the title. Using xlink:title ensures the call works in IE
     // but only FireFox seems to show the title.
     // without xlink: in there, it breaks IE.
-    a.setAttributeNS(ns.xlink, "xlink:title", s.title);
+    a.setAttributeNS(this.xlink, "xlink:title", s.title);
     return a;
   }
   if (a) a.parentNode.replaceChild(e, a);
@@ -4600,7 +4675,7 @@ pv.SvgScene.title = function(e, s) {
 /** TODO */
 pv.SvgScene.dispatch = pv.listener(function(e) {
   var t = e.target.$scene;
-  if (t) t.scenes.mark.dispatch(e, t.scenes, t.index);
+  if (t) pv.Mark.dispatch(e, t.scenes, t.index);
 });
 
 /** TODO */
@@ -4612,27 +4687,8 @@ pv.SvgScene.removeSiblings = function(e) {
   }
 };
 
-pv.SvgScene.scale = 1;
-
-/** @private */
-pv.SvgScene.implicit = {
-  svg: {
-    "shape-rendering": "auto",
-    "x": 0,
-    "y": 0,
-    "dy": 0,
-    "text-anchor": "start",
-    "transform": "translate(0,0)",
-    "fill": "none",
-    "fill-opacity": 1,
-    "stroke": "none",
-    "stroke-opacity": 1,
-    "stroke-width": 1.5
-  },
-  css: {
-    "font": "10px sans-serif"
-  }
-};
+/** @private Do nothing when rendering undefined mark types. */
+pv.SvgScene.undefined = function() {};
 // TODO strokeStyle for areaSegment?
 
 pv.SvgScene.area = function(scenes) {
@@ -4648,35 +4704,54 @@ pv.SvgScene.area = function(scenes) {
   var fill = s.fillStyle, stroke = s.strokeStyle;
   if (!fill.opacity && !stroke.opacity) return e;
 
-  /* points */
-  var p1 = "", p2 = "";
-  for (var i = 0, j = scenes.length - 1; j >= 0; i++, j--) {
-    var si = scenes[i], sj = scenes[j];
-    p1 += si.left + "," + si.top + " ";
-    p2 += (sj.left + sj.width) + "," + (sj.top + sj.height) + " ";
+  /* interpolate */
+  var step = {"step-before": 1, "step-after": 2}[s.interpolate];
 
-    /* interpolate (assume linear by default) */
-    if (i < scenes.length - 1) {
-      var sk = scenes[i + 1], sl = scenes[j - 1];
-      switch (s.interpolate) {
-        case "step-before": {
-          p1 += si.left + "," + sk.top + " ";
-          p2 += (sl.left + sl.width) + "," + (sj.top + sj.height) + " ";
-          break;
-        }
-        case "step-after": {
-          p1 += sk.left + "," + si.top + " ";
-          p2 += (sj.left + sj.width) + "," + (sl.top + sl.height) + " ";
-          break;
+  /** @private Computes the path for the range [i, j]. */
+  function path(i, j) {
+    var p1 = [], p2 = [];
+    for (var k = j; i <= k; i++, j--) {
+      var si = scenes[i],
+          sj = scenes[j],
+          pi = si.left + "," + si.top,
+          pj = (sj.left + sj.width) + "," + (sj.top + sj.height);
+
+      /* interpolate */
+      if (step && (i < k)) {
+        var sk = scenes[i + 1], sl = scenes[j - 1];
+        if (step & 1) {
+          pi += "V" + sk.top;
+          pj += "H" + (sl.left + sl.width);
+        } else {
+          pi += "H" + sk.left;
+          pj += "V" + (sl.top + sl.height);
         }
       }
+
+      p1.push(pi);
+      p2.push(pj);
     }
+    return p1.concat(p2).join("L");
   }
 
-  e = this.expect(e, "polygon", {
+  /* points */
+  var d = [], si, sj;
+  for (var i = 0; i < scenes.length; i++) {
+    si = scenes[i]; if (!si.width && !si.height) continue;
+    for (var j = i + 1; j < scenes.length; j++) {
+      sj = scenes[j]; if (!sj.width && !sj.height) break;
+    }
+    if (i && (step != 2)) i--;
+    if ((j < scenes.length) && (step != 1)) j++;
+    d.push(path(i, i = j - 1));
+  }
+  if (!d.length) return e;
+
+  e = this.expect(e, "path", {
       "shape-rendering": s.antialias ? null : "crispEdges",
+      "pointer-events": s.events,
       "cursor": s.cursor,
-      "points": p1 + p2,
+      "d": "M" + d.join("ZM") + "Z",
       "fill": fill.color,
       "fill-opacity": fill.opacity || null,
       "stroke": stroke.color,
@@ -4696,14 +4771,22 @@ pv.SvgScene.areaSegment = function(scenes) {
     var fill = s1.fillStyle, stroke = s1.strokeStyle;
     if (!fill.opacity && !stroke.opacity) continue;
 
+    /* interpolate */
+    var si = s1, sj = s2;
+    switch (s1.interpolate) {
+      case "step-before": si = s2; break;
+      case "step-after": sj = s1; break;
+    }
+
     /* points */
-    var p = s1.left + "," + s1.top + " "
-        + s2.left + "," + s2.top + " "
-        + (s2.left + s2.width) + "," + (s2.top + s2.height) + " "
-        + (s1.left + s1.width) + "," + (s1.top + s1.height);
+    var p = s1.left + "," + si.top + " "
+        + s2.left + "," + sj.top + " "
+        + (s2.left + s2.width) + "," + (sj.top + sj.height) + " "
+        + (s1.left + s1.width) + "," + (si.top + si.height);
 
     e = this.expect(e, "polygon", {
         "shape-rendering": s1.antialias ? null : "crispEdges",
+        "pointer-events": s1.events,
         "cursor": s1.cursor,
         "points": p,
         "fill": fill.color,
@@ -4728,6 +4811,7 @@ pv.SvgScene.bar = function(scenes) {
 
     e = this.expect(e, "rect", {
         "shape-rendering": s.antialias ? null : "crispEdges",
+        "pointer-events": s.events,
         "cursor": s.cursor,
         "x": s.left,
         "y": s.top,
@@ -4754,7 +4838,7 @@ pv.SvgScene.dot = function(scenes) {
     if (!fill.opacity && !stroke.opacity) continue;
 
     /* points */
-    var radius = Math.sqrt(s.size), path;
+    var radius = s.radius, path = null;
     switch (s.shape) {
       case "cross": {
         path = "M" + -radius + "," + -radius
@@ -4764,7 +4848,7 @@ pv.SvgScene.dot = function(scenes) {
         break;
       }
       case "triangle": {
-        var h = radius, w = radius * 2 / Math.sqrt(3);
+        var h = radius, w = radius * 1.1547; // 2 / Math.sqrt(3)
         path = "M0," + h
             + "L" + w +"," + -h
             + " " + -w + "," + -h
@@ -4772,7 +4856,7 @@ pv.SvgScene.dot = function(scenes) {
         break;
       }
       case "diamond": {
-        radius *= Math.sqrt(2);
+        radius *= 1.414214; // Math.sqrt(2)
         path = "M0," + -radius
             + "L" + radius + ",0"
             + " 0," + radius
@@ -4797,6 +4881,7 @@ pv.SvgScene.dot = function(scenes) {
     /* Use <circle> for circles, <path> for everything else. */
     var svg = {
       "shape-rendering": s.antialias ? null : "crispEdges",
+      "pointer-events": s.events,
       "fill": fill.color,
       "fill-opacity": fill.opacity || null,
       "stroke": stroke.color,
@@ -4838,7 +4923,7 @@ pv.SvgScene.image = function(scenes) {
         "width": s.width,
         "height": s.height
       });
-    e.setAttributeNS(ns.xlink, "href", s.url);
+    e.setAttributeNS(this.xlink, "href", s.url);
     e = this.append(e, scenes, i);
 
     /* stroke */
@@ -4881,7 +4966,8 @@ pv.SvgScene.label = function(scenes) {
     }
 
     e = this.expect(e, "text", {
-        "pointer-events": "none",
+        "pointer-events": s.events,
+        "cursor": s.cursor,
         "x": x,
         "y": y,
         "dy": dy,
@@ -4926,39 +5012,14 @@ pv.SvgScene.line = function(scenes) {
   if (!fill.opacity && !stroke.opacity) return e;
 
   /* points */
-  var d = "", t = "M";
-  for (var i = 0; i < scenes.length; i++) {
-    var si = scenes[i];
-    d += t + si.left + "," + si.top;
-
-    /* interpolate (assume linear by default) */
-    if (i < scenes.length - 1) {
-      t = "L";
-      var sj = scenes[i + 1];
-      switch (s.interpolate) {
-        case "polar": {
-          var dx = sj.left - si.left,
-              dy = sj.top - si.top,
-              r = Math.sqrt(dx * dx + dy * dy) / 2;
-          d += "A" + r + "," + r + " 0 1,1";
-          t = " ";
-          break;
-        }
-        case "step-before": {
-          d += "V" + sj.top;
-          break;
-        }
-        case "step-after": {
-          d += "H" + sj.left;
-          break;
-        }
-      }
-    }
+  var d = "M" + s.left + "," + s.top;
+  for (var i = 1; i < scenes.length; i++) {
+    d += this.pathSegment(scenes[i - 1], scenes[i]);
   }
-
 
   e = this.expect(e, "path", {
       "shape-rendering": s.antialias ? null : "crispEdges",
+      "pointer-events": s.events,
       "cursor": s.cursor,
       "d": d,
       "fill": fill.color,
@@ -4977,75 +5038,98 @@ pv.SvgScene.lineSegment = function(scenes) {
 
     /* visible */
     if (!s1.visible || !s2.visible) continue;
-    var stroke = s1.strokeStyle;
+    var stroke = s1.strokeStyle, fill = pv.Color.transparent;
     if (!stroke.opacity) continue;
 
-    /* Line-line intersection, per Akenine-Moller 16.16.1. */
-    function intersect(o1, d1, o2, d2) {
-      return o1.plus(d1.times(o2.minus(o1).dot(d2.perp()) / d1.dot(d2.perp())));
+    /* interpolate */
+    var d;
+    if (s1.interpolate == "linear") {
+      fill = stroke;
+      stroke = pv.Color.transparent;
+      d = this.pathJoin(scenes[i - 1], s1, s2, scenes[i + 2]);
+    } else {
+      d = "M" + s1.left + "," + s1.top + this.pathSegment(s1, s2);
     }
 
-    /*
-     * P1-P2 is the current line segment. V is a vector that is perpendicular to
-     * the line segment, and has length lineWidth / 2. ABCD forms the initial
-     * bounding box of the line segment (i.e., the line segment if we were to do
-     * no joins).
-     */
-    var p1 = pv.vector(s1.left, s1.top),
-        p2 = pv.vector(s2.left, s2.top),
-        p = p2.minus(p1),
-        v = p.perp().norm(),
-        w = v.times(s1.lineWidth / (2 * this.scale)),
-        a = p1.plus(w),
-        b = p2.plus(w),
-        c = p2.minus(w),
-        d = p1.minus(w);
-
-    /*
-     * Start join. P0 is the previous line segment's start point. We define the
-     * cutting plane as the average of the vector perpendicular to P0-P1, and
-     * the vector perpendicular to P1-P2. This insures that the cross-section of
-     * the line on the cutting plane is equal if the line-width is unchanged.
-     * Note that we don't implement miter limits, so these can get wild.
-     */
-    if (i > 0) {
-      var s0 = scenes[i - 1];
-      if (s0.visible) {
-        var v1 = p1.minus(s0.left, s0.top).perp().norm().plus(v);
-        d = intersect(p1, v1, d, p);
-        a = intersect(p1, v1, a, p);
-      }
-    }
-
-    /* Similarly, for end join. */
-    if (i < (n - 1)) {
-      var s3 = scenes[i + 2];
-      if (s3.visible) {
-        var v2 = pv.vector(s3.left, s3.top).minus(p2).perp().norm().plus(v);
-        c = intersect(p2, v2, c, p);
-        b = intersect(p2, v2, b, p);
-      }
-    }
-
-    /* points */
-    var p = a.x + "," + a.y + " "
-      + b.x + "," + b.y + " "
-      + c.x + "," + c.y + " "
-      + d.x + "," + d.y;
-
-    e = this.expect(e, "polygon", {
+    e = this.expect(e, "path", {
         "shape-rendering": s1.antialias ? null : "crispEdges",
+        "pointer-events": s1.events,
         "cursor": s1.cursor,
-        "points": p,
-        "fill": stroke.color,
-        "fill-opacity": stroke.opacity || null
+        "d": d,
+        "fill": fill.color,
+        "fill-opacity": fill.opacity || null,
+        "stroke": stroke.color,
+        "stroke-opacity": stroke.opacity || null,
+        "stroke-width": stroke.opacity ? s1.lineWidth / this.scale : null
       });
     e = this.append(e, scenes, i);
   }
   return e;
 };
-var guid = 0;
 
+/** @private Returns the path segment for the specified points. */
+pv.SvgScene.pathSegment = function(s1, s2) {
+  switch (s1.interpolate) {
+    case "polar": {
+      var dx = s2.left - s1.left,
+          dy = s2.top - s1.top,
+          r = Math.sqrt(dx * dx + dy * dy) / 2;
+      return "A" + r + "," + r + " 0 1,1 " + s2.left + "," + s2.top;
+    }
+    case "step-before": return "V" + s2.top + "H" + s2.left;
+    case "step-after": return "H" + s2.left + "V" + s2.top;
+  }
+  return "L" + s2.left + "," + s2.top;
+};
+
+/** @private Line-line intersection, per Akenine-Moller 16.16.1. */
+pv.SvgScene.lineIntersect = function(o1, d1, o2, d2) {
+  return o1.plus(d1.times(o2.minus(o1).dot(d2.perp()) / d1.dot(d2.perp())));
+}
+
+/** @private Returns the miter join path for the specified points. */
+pv.SvgScene.pathJoin = function(s0, s1, s2, s3) {
+  /*
+   * P1-P2 is the current line segment. V is a vector that is perpendicular to
+   * the line segment, and has length lineWidth / 2. ABCD forms the initial
+   * bounding box of the line segment (i.e., the line segment if we were to do
+   * no joins).
+   */
+  var p1 = pv.vector(s1.left, s1.top),
+      p2 = pv.vector(s2.left, s2.top),
+      p = p2.minus(p1),
+      v = p.perp().norm(),
+      w = v.times(s1.lineWidth / (2 * this.scale)),
+      a = p1.plus(w),
+      b = p2.plus(w),
+      c = p2.minus(w),
+      d = p1.minus(w);
+
+  /*
+   * Start join. P0 is the previous line segment's start point. We define the
+   * cutting plane as the average of the vector perpendicular to P0-P1, and
+   * the vector perpendicular to P1-P2. This insures that the cross-section of
+   * the line on the cutting plane is equal if the line-width is unchanged.
+   * Note that we don't implement miter limits, so these can get wild.
+   */
+  if (s0 && s0.visible) {
+    var v1 = p1.minus(s0.left, s0.top).perp().norm().plus(v);
+    d = this.lineIntersect(p1, v1, d, p);
+    a = this.lineIntersect(p1, v1, a, p);
+  }
+
+  /* Similarly, for end join. */
+  if (s3 && s3.visible) {
+    var v2 = pv.vector(s3.left, s3.top).minus(p2).perp().norm().plus(v);
+    c = this.lineIntersect(p2, v2, c, p);
+    b = this.lineIntersect(p2, v2, b, p);
+  }
+
+  return "M" + a.x + "," + a.y
+      + "L" + b.x + "," + b.y
+      + " " + c.x + "," + c.y
+      + " " + d.x + "," + d.y;
+};
 pv.SvgScene.panel = function(scenes) {
   var g = scenes.$g, e = g && g.firstChild;
   for (var i = 0; i < scenes.length; i++) {
@@ -5068,7 +5152,6 @@ pv.SvgScene.panel = function(scenes) {
         g.setAttribute("fill", "none");
         g.setAttribute("stroke", "none");
         g.setAttribute("stroke-width", 1.5);
-        g.style.display = "inline-block";
 
         if (pv.renderer() == "svgweb") { // SVGWeb requires a separate mechanism for setting event listeners.
             // width/height can't be set on the fragment
@@ -5085,6 +5168,7 @@ pv.SvgScene.panel = function(scenes) {
                 this.addEventListener ('mouseout', pv.SvgScene.dispatch, true);
                 this.addEventListener ('mouseover', pv.SvgScene.dispatch, true);
                 this.addEventListener ('mousemove', pv.SvgScene.dispatch, true);
+                this.addEventListener ('mousewheel', pv.SvgScene.dispatch, true);
                 scenes.$g = this;
             }, false);
 
@@ -5113,7 +5197,7 @@ pv.SvgScene.panel = function(scenes) {
 
     /* clip (nest children) */
     if (s.overflow == "hidden") {
-      var id = (guid++).toString(36),
+      var id = pv.id().toString(36),
           c = this.expect(e, "g", {"clip-path": "url(#" + id + ")"});
       if (!c.parentNode) g.appendChild(c);
       scenes.$g = g = c;
@@ -5167,9 +5251,10 @@ pv.SvgScene.panel = function(scenes) {
 
 pv.SvgScene.fill = function(e, scenes, i) {
   var s = scenes[i], fill = s.fillStyle;
-  if (fill.opacity) {
+  if (fill.opacity || s.events == "all") {
     e = this.expect(e, "rect", {
         "shape-rendering": s.antialias ? null : "crispEdges",
+        "pointer-events": s.events,
         "cursor": s.cursor,
         "x": s.left,
         "y": s.top,
@@ -5186,9 +5271,10 @@ pv.SvgScene.fill = function(e, scenes, i) {
 
 pv.SvgScene.stroke = function(e, scenes, i) {
   var s = scenes[i], stroke = s.strokeStyle;
-  if (stroke.opacity) {
+  if (stroke.opacity || s.events == "all") {
     e = this.expect(e, "rect", {
         "shape-rendering": s.antialias ? null : "crispEdges",
+        "pointer-events": s.events == "all" ? "stroke" : s.events,
         "cursor": s.cursor,
         "x": s.left,
         "y": s.top,
@@ -5215,6 +5301,7 @@ pv.SvgScene.rule = function(scenes) {
 
     e = this.expect(e, "line", {
         "shape-rendering": s.antialias ? null : "crispEdges",
+        "pointer-events": s.events,
         "cursor": s.cursor,
         "x1": s.left,
         "y1": s.top,
@@ -5279,6 +5366,7 @@ pv.SvgScene.wedge = function(scenes) {
 
     e = this.expect(e, "path", {
         "shape-rendering": s.antialias ? null : "crispEdges",
+        "pointer-events": s.events,
         "cursor": s.cursor,
         "transform": "translate(" + s.left + "," + s.top + ")",
         "d": p,
@@ -5360,12 +5448,13 @@ pv.Mark = function() {
    * in order of evaluation!
    */
   this.$properties = [];
+  this.$handlers = {};
 };
 
 /** @private Records which properties are defined on this mark type. */
 pv.Mark.prototype.properties = {};
 
-/** @private Records which the cast function for each property. */
+/** @private Records the cast function for each property. */
 pv.Mark.cast = {};
 
 /**
@@ -5435,42 +5524,63 @@ pv.Mark.prototype.property = function(name, cast) {
    * define a "name" property that is evaluated on derived marks, even though
    * those marks don't normally have a name.
    */
-  pv.Mark.prototype[name] = function(v) {
+  pv.Mark.prototype.propertyMethod(name, false, pv.Mark.cast[name] = cast);
+  return this;
+};
+
+/**
+ * @private Defines a setter-getter for the specified property.
+ *
+ * <p>If a cast function has been assigned to the specified property name, the
+ * property function is wrapped by the cast function, or, if a constant is
+ * specified, the constant is immediately cast. Note, however, that if the
+ * property value is null, the cast function is not invoked.
+ *
+ * @param {string} name the property name.
+ * @param {boolean} [def] whether is a property or a def.
+ * @param {function} [cast] the cast function for this property.
+ */
+pv.Mark.prototype.propertyMethod = function(name, def, cast) {
+  if (!cast) cast = pv.Mark.cast[name];
+  this[name] = function(v) {
+
+      /* If this is a def, use it rather than property. */
+      if (def && this.scene) {
+        var defs = this.scene.defs;
+        if (arguments.length) {
+          defs[name] = {
+            id: (v == undefined) ? 0 : pv.id(),
+            value: ((v != null) && cast) ? cast(v) : v
+          };
+          return this;
+        }
+        return defs[name] ? defs[name].value : null;
+      }
+
+      /* If arguments are specified, set the property value. */
       if (arguments.length) {
-        this.propertyValue(name, v);
+        var type = !def << 1 | (typeof v == "function");
+        this.propertyValue(name, (type & 1 && cast) ? function() {
+            var x = v.apply(this, arguments);
+            return (x != null) ? cast(x) : null;
+          } : (((v != null) && cast) ? cast(v) : v)).type = type;
         return this;
       }
-      return this.scene[this.index][name];
+
+      return this.instance()[name];
     };
-  pv.Mark.cast[name] = cast;
-  return this;
 };
 
 /** @private Sets the value of the property <i>name</i> to <i>v</i>. */
 pv.Mark.prototype.propertyValue = function(name, v) {
-  /* Replace existing property definition, if found. */
-  for (var i = 0; i < this.$properties.length; i++) {
-    if (this.$properties[i].name == name) {
-      this.$properties.splice(i, 1);
+  var properties = this.$properties, p = {name: name, id: pv.id(), value: v};
+  for (var i = 0; i < properties.length; i++) {
+    if (properties[i].name == name) {
+      properties.splice(i, 1);
       break;
     }
   }
-
-  /*
-   * If a cast function is specified, the property function is wrapped by the
-   * cast function, or, if a constant is specified, the constant is immediately
-   * cast. Note, however, that if the property value is null, the cast function
-   * is not invoked.
-   */
-  var c = pv.Mark.cast[name], f = typeof v == "function", p = {
-      name: name,
-      type: f ? 3 : 2,
-      value: (f && c) ? function() {
-          var x = v.apply(this, arguments);
-          return (x != null) ? c(x) : null;
-        } : (((v != null) && c) ? c(v) : v)
-    };
-  this.$properties.push(p);
+  properties.push(p);
   return p;
 };
 
@@ -5485,7 +5595,8 @@ pv.Mark.prototype
     .property("cursor", String)
     .property("title", String)
     .property("reverse", Boolean)
-    .property("antialias", Boolean);
+    .property("antialias", Boolean)
+    .property("events", String);
 
 /**
  * The mark type; a lower camelCase name. The type name controls rendering
@@ -5533,6 +5644,22 @@ pv.Mark.prototype.childIndex = -1;
  * @type number
  */
 pv.Mark.prototype.index = -1;
+
+/**
+ * The current scale factor, based on any enclosing transforms. The current
+ * scale can be used to create scale-independent graphics. For example, to
+ * define a dot that has a radius of 10 irrespective of any zooming, say:
+ *
+ * <pre>dot.radius(function() 10 / this.scale)</pre>
+ *
+ * Note that the stroke width and font size are defined irrespective of scale
+ * (i.e., in screen space) already. Also note that when a transform is applied
+ * to a panel, the scale affects only the child marks, not the panel itself.
+ *
+ * @type number
+ * @see pv.Panel.prototype.transform
+ */
+pv.Mark.prototype.scale = 1;
 
 /**
  * The scene graph. The scene graph is an array of objects; each object (or
@@ -5668,6 +5795,26 @@ pv.Mark.prototype.index = -1;
  */
 
 /**
+ * The events property; corresponds to the SVG pointer-events property,
+ * specifying how the mark should participate in mouse events. The default value
+ * is "painted". Supported values are:
+ *
+ * <p>"painted": The given mark may receive events when the mouse is over a
+ * "painted" area. The painted areas are the interior (i.e., fill) of the mark
+ * if a 'fillStyle' is specified, and the perimeter (i.e., stroke) of the mark
+ * if a 'strokeStyle' is specified.
+ *
+ * <p>"all": The given mark may receive events when the mouse is over either the
+ * interior (i.e., fill) or the perimeter (i.e., stroke) of the mark, regardless
+ * of the specified fillStyle and strokeStyle.
+ *
+ * <p>"none": The given mark may not receive events.
+ *
+ * @type string
+ * @name pv.Mark.prototype.events
+ */
+
+/**
  * The reverse property; a boolean determining whether marks are ordered from
  * front-to-back or back-to-front. SVG does not support explicit z-ordering;
  * shapes are rendered in the order they appear. Thus, by default, marks are
@@ -5691,8 +5838,8 @@ pv.Mark.prototype.index = -1;
 pv.Mark.prototype.defaults = new pv.Mark()
     .data(function(d) { return [d]; })
     .visible(true)
-    .reverse(false)
-    .antialias(true);
+    .antialias(true)
+    .events("painted");
 
 /**
  * Sets the prototype of this mark to the specified mark. Any properties not
@@ -5767,26 +5914,92 @@ pv.Mark.prototype.add = function(type) {
  * function.
  */
 pv.Mark.prototype.def = function(name, v) {
-  this.propertyValue(name, v).type -= 2;
-  return this;
+  this.propertyMethod(name, true);
+  return this[name](v);
 };
 
 /**
- * Returns an anchor with the specified name. While anchor names are typically
- * constants, the anchor name is a true property, which means you can specify a
- * function to compute the anchor name dynamically. See the
- * {@link pv.Anchor#name} property for details.
+ * Returns an anchor with the specified name. All marks support the five
+ * standard anchor names:<ul>
+ *
+ * <li>top
+ * <li>left
+ * <li>center
+ * <li>bottom
+ * <li>right
+ *
+ * </ul>In addition to positioning properties (left, right, top bottom), the
+ * anchors support text rendering properties (text-align, text-baseline). Text is
+ * rendered to appear inside the mark by default.
+ *
+ * <p>To facilitate stacking, anchors are defined in terms of their opposite
+ * edge. For example, the top anchor defines the bottom property, such that the
+ * mark extends upwards; the bottom anchor instead defines the top property,
+ * such that the mark extends downwards. See also {@link pv.Layout.Stack}.
+ *
+ * <p>While anchor names are typically constants, the anchor name is a true
+ * property, which means you can specify a function to compute the anchor name
+ * dynamically. See the {@link pv.Anchor#name} property for details.
  *
  * @param {string} name the anchor name; either a string or a property function.
  * @returns {pv.Anchor} the new anchor.
  */
 pv.Mark.prototype.anchor = function(name) {
-  var mark = this, anchor = new pv.Anchor().name(name);
-  anchor.anchorTarget = function() { return mark; };
-  anchor.parent = this.parent;
-  return anchor
-    .data(function() { return mark.scene.map(function(s) { return s.data; }); })
-    .visible(function() { return mark.visible(); });
+  var target = this;
+  return new pv.Anchor(this)
+    .name(name)
+    .data(function() {
+        return target.scene.map(function(s) { return s.data; });
+      })
+    .visible(function() {
+        return target.instance().visible;
+      })
+    .left(function() {
+        var s = target.instance(), w = s.width || 0;
+        switch (this.name()) {
+          case "bottom":
+          case "top":
+          case "center": return s.left + (this.properties.width ? 0 : w / 2);
+          case "right": return s.left + w;
+        }
+        return null;
+      })
+    .top(function() {
+        var s = target.instance(), h = s.height || 0;
+        switch (this.name()) {
+          case "left":
+          case "right":
+          case "center": return s.top + (this.properties.height ? 0 : h / 2);
+          case "bottom": return s.top + h;
+        }
+        return null;
+      })
+    .right(function() {
+        var s = target.instance();
+        return this.name() == "left" ? s.right + (s.width || 0) : null;
+      })
+    .bottom(function() {
+        var s = target.instance();
+        return this.name() == "top" ? s.bottom + (s.height || 0) : null;
+      })
+    .textAlign(function() {
+        switch (this.name()) {
+          case "bottom":
+          case "top":
+          case "center": return "center";
+          case "right": return "right";
+        }
+        return "left";
+      })
+    .textBaseline(function() {
+        switch (this.name()) {
+          case "right":
+          case "left":
+          case "center": return "middle";
+          case "top": return "top";
+        }
+        return "bottom";
+      });
 };
 
 /**
@@ -5803,6 +6016,31 @@ pv.Mark.prototype.anchor = function(name) {
  */
 pv.Mark.prototype.anchorTarget = function() {
   return this.proto.anchorTarget();
+};
+
+/**
+ * Alias for setting the left, right, top and bottom properties simultaneously.
+ *
+ * @returns {pv.Mark} this.
+ */
+pv.Mark.prototype.margin = function(n) {
+  return this.left(n).right(n).top(n).bottom(n);
+};
+
+/**
+ * Returns the current instance of this mark in the scene graph. This is
+ * typically equivalent to <tt>this.scene[this.index]</tt>, however if the scene
+ * or index is unset, the default instance of the mark is returned. If no
+ * default is set, the default is the last instance. Similarly, if the scene or
+ * index of the parent panel is unset, the default instance of this mark in the
+ * last instance of the enclosing panel is returned, and so on.
+ *
+ * @returns a node in the scene graph.
+ */
+pv.Mark.prototype.instance = function(defaultIndex) {
+  var scene = this.scene || this.parent.instance(-1).children[this.childIndex],
+      index = !arguments.length || this.hasOwnProperty("index") ? this.index : defaultIndex;
+  return scene[index < 0 ? scene.length - 1 : index];
 };
 
 /**
@@ -5858,15 +6096,19 @@ pv.Mark.prototype.cousin = function() {
  * a panel.
  */
 pv.Mark.prototype.render = function() {
-  if (!this.root.scene) {
-    /* For the first render, take it from the top. */
-    if (this.parent) {
-      this.root.render();
-      return;
-    }
-  } else {
-    /* Clear the data stack if called from an event handler. */
-    delete this.root.scene.data;
+  var parent = this.parent,
+      stack = pv.Mark.stack;
+
+  /* For the first render, take it from the top. */
+  if (parent && !this.root.scene) {
+    this.root.render();
+    return;
+  }
+
+  /* Record the path to this mark. */
+  var indexes = [];
+  for (var mark = this; mark.parent; mark = mark.parent) {
+    indexes.unshift(mark.childIndex);
   }
 
   /**
@@ -5881,67 +6123,99 @@ pv.Mark.prototype.render = function() {
    * instance of the panel will be rendered; otherwise, all visible instances of
    * the mark will be rendered.
    */
-  var render = function(mark, depth) {
+  function render(mark, depth, scale) {
+    mark.scale = scale;
     if (depth < indexes.length) {
-      var childIndex = indexes[depth], child = mark.children[childIndex];
+      stack.unshift(null);
       if (mark.hasOwnProperty("index")) {
-        var i = mark.index;
-        if (mark.scene[i].visible) {
-          child.scene = mark.scene[i].children[childIndex];
-          render(child, depth + 1);
-        }
+        renderInstance(mark, depth, scale);
       } else {
-        for (var i = 0; i < mark.scene.length; i++) {
-          if (mark.scene[i].visible) {
-            mark.index = i;
-            child.scene = mark.scene[i].children[childIndex];
-            render(child, depth + 1);
-          }
+        for (var i = 0, n = mark.scene.length; i < n; i++) {
+          mark.index = i;
+          renderInstance(mark, depth, scale);
         }
         delete mark.index;
       }
-      delete child.scene;
-      return;
-    }
+      stack.shift();
+    } else {
+      mark.build();
 
-    /* Now that the scene stack is set, evaluate the properties. */
-    mark.build();
+      /*
+       * In the update phase, the scene is rendered by creating and updating
+       * elements and attributes in the SVG image. No properties are evaluated
+       * during the update phase; instead the values computed previously in the
+       * build phase are simply translated into SVG. The update phase is
+       * decoupled (see pv.Scene) to allow different rendering engines.
+       */
+      pv.Scene.scale = scale;
 
-    /*
-     * In the update phase, the scene is rendered by creating and updating
-     * elements and attributes in the SVG image. No properties are evaluated
-     * during the update phase; instead the values computed previously in the
-     * build phase are simply translated into SVG. The update phase is decoupled
-     * (see pv.Scene) to allow different rendering engines.
-     */
-    var id = null;
-    if (mark.scene && mark.scene.$g && mark.scene.$g.suspendRedraw)
+      var id = null; // SVGWeb performance enhancement.
+      if (mark.scene && mark.scene.$g && mark.scene.$g.suspendRedraw)
         id = mark.scene.$g.suspendRedraw(1000);
-    pv.Scene.updateAll(mark.scene);
-    if (id)
-        mark.scene.$g.unsuspendRedraw(id);
 
-    delete mark.root.scene.data;
+      pv.Scene.updateAll(mark.scene);
+
+      if (id) // SVGWeb performance enhancement.
+          mark.scene.$g.unsuspendRedraw(id);
+    }
+    delete mark.scale;
+  }
+
+  /**
+   * @private Recursively renders the current instance of the specified mark.
+   * This is slightly tricky because `index` and `scene` properties may or may
+   * not already be set; if they are set, it means we are rendering only a
+   * specific instance; if they are unset, we are rendering all instances.
+   * Furthermore, we must preserve the original context of these properties when
+   * rendering completes.
+   *
+   * <p>Another tricky aspect is that the `scene` attribute should be set for
+   * any preceding children, so as to allow property chaining. This is
+   * consistent with first-pass rendering.
+   */
+  function renderInstance(mark, depth, scale) {
+    var s = mark.scene[mark.index], i;
+    if (s.visible) {
+      var childIndex = indexes[depth],
+          child = mark.children[childIndex];
+
+      /* Set preceding child scenes. */
+      for (i = 0; i < childIndex; i++) {
+        mark.children[i].scene = s.children[i];
+      }
+
+      /* Set current child scene, if necessary. */
+      stack[0] = s.data;
+      if (child.scene) {
+        render(child, depth + 1, scale * s.transform.k);
+      } else {
+        child.scene = s.children[childIndex];
+        render(child, depth + 1, scale * s.transform.k);
+        delete child.scene;
+      }
+
+      /* Clear preceding child scenes. */
+      for (i = 0; i < childIndex; i++) {
+        delete mark.children[i].scene;
+      }
+    }
   }
 
   /* Bind this mark's property definitions. */
   this.bind();
 
+  /* The render context is the first ancestor with an explicit index. */
+  while (parent && !parent.hasOwnProperty("index")) parent = parent.parent;
+
   /* Recursively render all instances of this mark. */
-  var indexes = [];
-  for (var m = this; m.parent; m = m.parent) indexes.unshift(m.childIndex);
-  render(this.root, 0);
+  this.context(
+      parent ? parent.scene : undefined,
+      parent ? parent.index : -1,
+      function() { render(this.root, 0, 1); });
 };
 
-/** @private Computes the root data stack for the specified mark. */
-function argv(mark) {
-  var stack = [];
-  while (mark) {
-    stack.push(mark.scene[mark.index].data);
-    mark = mark.parent;
-  }
-  return stack;
-}
+/** @private Stores the current data stack. */
+pv.Mark.stack = [];
 
 /**
  * @private In the bind phase, inherited property definitions are cached so they
@@ -5950,14 +6224,14 @@ function argv(mark) {
 pv.Mark.prototype.bind = function() {
   var seen = {}, types = [[], [], [], []], data, visible;
 
-  /** TODO */
+  /** Scans the proto chain for the specified mark. */
   function bind(mark) {
     do {
       var properties = mark.$properties;
       for (var i = properties.length - 1; i >= 0 ; i--) {
         var p = properties[i];
         if (!(p.name in seen)) {
-          seen[p.name] = 1;
+          seen[p.name] = p;
           switch (p.name) {
             case "data": data = p; break;
             case "visible": visible = p; break;
@@ -5966,25 +6240,6 @@ pv.Mark.prototype.bind = function() {
         }
       }
     } while (mark = mark.proto);
-  }
-
-  /** TODO */
-  function def(name) {
-    return function(v) {
-      var defs = this.scene.defs;
-      if (arguments.length) {
-        if (v == undefined) {
-          delete defs.locked[name];
-        } else {
-          defs.locked[name] = true;
-        }
-        var c = pv.Mark.cast[name];
-        defs.values[name] = ((v != null) && c) ? c(v) : v;
-        return this;
-      } else {
-        return defs.values[name];
-      }
-    };
   }
 
   /* Scan the proto chain for all defined properties. */
@@ -5997,20 +6252,19 @@ pv.Mark.prototype.bind = function() {
   var mark = this;
   do for (var name in mark.properties) {
     if (!(name in seen)) {
-      seen[name] = 1;
-      types[2].push({name: name, type: 2, value: null});
+      types[2].push(seen[name] = {name: name, type: 2, value: null});
     }
   } while (mark = mark.proto);
 
   /* Define setter-getter for inherited defs. */
   var defs = types[0].concat(types[1]);
   for (var i = 0; i < defs.length; i++) {
-    var d = defs[i];
-    this[d.name] = def(d.name);
+    this.propertyMethod(defs[i].name, true);
   }
 
   /* Setup binds to evaluate constants before functions. */
   this.binds = {
+    properties: seen,
     data: data,
     defs: defs,
     required: [visible],
@@ -6053,7 +6307,7 @@ pv.Mark.prototype.bind = function() {
  * @param parent the instance of the parent panel from the scene graph.
  */
 pv.Mark.prototype.build = function() {
-  var scene = this.scene;
+  var scene = this.scene, stack = pv.Mark.stack;
   if (!scene) {
     scene = this.scene = [];
     scene.mark = this;
@@ -6065,38 +6319,24 @@ pv.Mark.prototype.build = function() {
     }
   }
 
-  /* Set the data stack. */
-  var stack = this.root.scene.data;
-  if (!stack) this.root.scene.data = stack = argv(this.parent);
-
   /* Evaluate defs. */
   if (this.binds.defs.length) {
     var defs = scene.defs;
-    if (!defs) scene.defs = defs = {values: {}, locked: {}};
+    if (!defs) scene.defs = defs = {};
     for (var i = 0; i < this.binds.defs.length; i++) {
-      var d = this.binds.defs[i];
-      if (!(d.name in defs.locked)) {
-        var v = d.value;
-        if (d.type == 1) {
-          property = d.name;
-          v = v.apply(this, stack);
-        }
-        defs.values[d.name] = v;
+      var p = this.binds.defs[i], d = defs[p.name];
+      if (!d || (p.id > d.id)) {
+        defs[p.name] = {
+          id: 0, // this def will be re-evaluated on next build
+          value: (p.type & 1) ? p.value.apply(this, stack) : p.value
+        };
       }
     }
   }
 
   /* Evaluate special data property. */
   var data = this.binds.data;
-  switch (data.type) {
-    case 0: case 1: data = defs.values.data; break;
-    case 2: data = data.value; break;
-    case 3: {
-      property = "data";
-      data = data.value.apply(this, stack);
-      break;
-    }
-  }
+  data = data.type & 1 ? data.value.apply(this, stack) : data.value;
 
   /* Create, update and delete scene nodes. */
   stack.unshift(null);
@@ -6108,10 +6348,9 @@ pv.Mark.prototype.build = function() {
     s.data = stack[0] = data[i];
     this.buildInstance(s);
   }
-  stack.shift();
-  delete this.index;
   pv.Mark.prototype.index = -1;
-  if (!this.parent) scene.data = null;
+  delete this.index;
+  stack.shift();
 
   return this;
 };
@@ -6127,12 +6366,9 @@ pv.Mark.prototype.buildProperties = function(s, properties) {
   for (var i = 0, n = properties.length; i < n; i++) {
     var p = properties[i], v = p.value; // assume case 2 (constant)
     switch (p.type) {
-      case 0: case 1: v = this.scene.defs.values[p.name]; break;
-      case 3: {
-        property = p.name;
-        v = v.apply(this, this.root.scene.data);
-        break;
-      }
+      case 0:
+      case 1: v = this.scene.defs[p.name].value; break;
+      case 3: v = v.apply(this, pv.Mark.stack); break;
     }
     s[p.name] = v;
   }
@@ -6217,16 +6453,6 @@ pv.Mark.prototype.buildImplied = function(s) {
 };
 
 /**
- * @private The name of the property being evaluated, for so-called "smart"
- * functions that change behavior depending on which property is being
- * evaluated. This functionality is somewhat magical, so for now, this feature
- * is not exposed outside the library.
- *
- * @type string
- */
-var property;
-
-/**
  * Returns the current location of the mouse (cursor) relative to this mark's
  * parent. The <i>x</i> coordinate corresponds to the left margin, while the
  * <i>y</i> coordinate corresponds to the top margin.
@@ -6237,19 +6463,23 @@ pv.Mark.prototype.mouse = function() {
   if (pv.renderer() == 'svgweb') {
       return pv.vector (pv.event.clientX * 1, pv.event.clientY * 1);
   } else {
+      /* Compute xy-coordinates relative to the panel. */
       var x = pv.event.pageX,
           y = pv.event.pageY,
-          t = pv.Transform.identity,
-          panel = (this instanceof pv.Panel) ? this : this.parent,
-          node = this.root.canvas();
+          n = this.root.canvas();
       do {
-        x -= node.offsetLeft;
-        y -= node.offsetTop;
-      } while (node = node.offsetParent);
-      do {
-        t = t.translate(panel.left(), panel.top()).times(panel.transform());
-      } while (panel = panel.parent);
+        x -= n.offsetLeft;
+        y -= n.offsetTop;
+      } while (n = n.offsetParent);
+
+      /* Compute the inverse transform of all enclosing panels. */
+      var t = pv.Transform.identity,
+          p = this.properties.transform ? this : this.parent
+          pz = [];
+      do { pz.push(p); } while (p = p.parent);
+      while (p = pz.pop()) t = t.translate(p.left(), p.top()).times(p.transform());
       t = t.invert();
+
       return pv.vector(x * t.k + t.x, y * t.k + t.y);
   }
 };
@@ -6303,15 +6533,91 @@ pv.Mark.prototype.mouse = function() {
  * @returns {pv.Mark} this.
  */
 pv.Mark.prototype.event = function(type, handler) {
-  if (!this.$handlers) this.$handlers = {};
   this.$handlers[type] = handler;
   return this;
 };
 
-/** @private TODO */
-pv.Mark.prototype.dispatch = function(e, scenes, index) {
+/** @private Evaluates the function <i>f</i> with the specified context. */
+pv.Mark.prototype.context = function(scene, index, f) {
+  var proto = pv.Mark.prototype,
+      stack = pv.Mark.stack,
+      oscene = pv.Mark.scene,
+      oindex = proto.index;
 
-  var l = this.$handlers && this.$handlers[e.type];
+  /** @private Sets the context. */
+  function apply(scene, index) {
+    pv.Mark.scene = scene;
+    proto.index = index;
+    if (!scene) return;
+
+    var that = scene.mark,
+        mark = that,
+        ancestors = [];
+
+    /* Set ancestors' scene and index; populate data stack. */
+    do {
+      ancestors.push(mark);
+      stack.push(scene[index].data);
+      mark.index = index;
+      mark.scene = scene;
+      index = scene.parentIndex;
+      scene = scene.parent;
+    } while (mark = mark.parent);
+
+    /* Set ancestors' scale; requires top-down. */
+    for (var i = ancestors.length - 1, k = 1; i > 0; i--) {
+      mark = ancestors[i];
+      mark.scale = k;
+      k *= mark.scene[mark.index].transform.k;
+    }
+
+    /* Set children's scene and scale. */
+    if (that.children) for (var i = 0, n = that.children.length; i < n; i++) {
+      mark = that.children[i];
+      mark.scene = that.scene[that.index].children[i];
+      mark.scale = k;
+    }
+  }
+
+  /** @private Clears the context. */
+  function clear(scene, index) {
+    if (!scene) return;
+    var that = scene.mark,
+        mark;
+
+    /* Reset children. */
+    if (that.children) for (var i = 0, n = that.children.length; i < n; i++) {
+      mark = that.children[i];
+      delete mark.scene;
+      delete mark.scale;
+    }
+
+    /* Reset ancestors. */
+    mark = that;
+    do {
+      stack.pop();
+      if (mark.parent) {
+        delete mark.scene;
+        delete mark.scale;
+      }
+      delete mark.index;
+    } while (mark = mark.parent);
+  }
+
+  /* Context switch, invoke the function, then switch back. */
+  clear(oscene, oindex);
+  apply(scene, index);
+  try {
+    f.apply(this, stack);
+  } finally {
+    clear(scene, index);
+    apply(oscene, oindex);
+  }
+};
+
+/** @private Execute the event listener, then re-render. */
+pv.Mark.dispatch = function(e, scene, index) {
+  var m = scene.mark, p = scene.parent, l = m.$handlers[e.type];
 
   if (pv.renderer() == 'svgweb' && e.type != 'mousemove') {
     // In SVGWeb, when nodes are rerendered, the re-render
@@ -6334,37 +6640,12 @@ pv.Mark.prototype.dispatch = function(e, scenes, index) {
     if (e.type == 'mouseout') this.lastDispatchLog['mouseover'] = null;
   }
 
-  if (!l) return this.parent
-      && this.parent.dispatch(e, scenes.parent, scenes.parentIndex);
-
-  try {
-    /* Setup the scene stack. */
-    var mark = this;
-    do {
-      mark.index = index;
-      mark.scene = scenes;
-      index = scenes.parentIndex;
-      scenes = scenes.parent;
-    } while (mark = mark.parent);
-
-    /* Execute the event listener. */
-    try {
-      mark = l.apply(this, this.root.scene.data = argv(this));
-    } finally {
+  if (!l) return p && pv.Mark.dispatch(e, p, scene.parentIndex);
+  m.context(scene, index, function() {
+      m = l.apply(m, pv.Mark.stack);
+      if (m && m.render) m.render();
       e.preventDefault();
-      this.root.scene.data = null;
-    }
-
-    /* Update the display. TODO dirtying. */
-    if (mark instanceof pv.Mark) mark.render();
-  } finally {
-    /* Restore the scene stack. */
-    var mark = this;
-    do {
-      if (mark.parent) delete mark.scene;
-      delete mark.index;
-    } while (mark = mark.parent);
-  }
+    });
 };
 /**
  * Constructs a new mark anchor with default properties.
@@ -6387,8 +6668,10 @@ pv.Mark.prototype.dispatch = function(e, scenes, index) {
  *
  * @extends pv.Mark
  */
-pv.Anchor = function() {
+pv.Anchor = function(target) {
   pv.Mark.call(this);
+  this.target = target;
+  this.parent = target.parent;
 };
 
 pv.Anchor.prototype = pv.extend(pv.Mark)
@@ -6411,6 +6694,10 @@ pv.Anchor.prototype = pv.extend(pv.Mark)
  * @type string
  * @name pv.Anchor.prototype.name
  */
+
+pv.Anchor.prototype.anchorTarget = function() {
+  return this.target;
+};
 /**
  * Constructs a new area mark with default properties. Areas are not typically
  * constructed directly, but by adding to a panel or an existing mark via
@@ -6525,8 +6812,6 @@ pv.Area.prototype.type = "area";
  * functions (i.e., step functions), either "step-before" or "step-after" can be
  * specified.
  *
- * <p>Note: this property is currently supported only on non-segmented areas.
- *
  * <p>This property is <i>fixed</i>. See {@link pv.Mark}.
  *
  * @type string
@@ -6545,95 +6830,7 @@ pv.Area.prototype.defaults = new pv.Area()
     .fillStyle(pv.Colors.category20().by(pv.parent))
     .interpolate("linear");
 
-/**
- * Constructs a new area anchor with default properties. Areas support five
- * different anchors:<ul>
- *
- * <li>top
- * <li>left
- * <li>center
- * <li>bottom
- * <li>right
- *
- * </ul>In addition to positioning properties (left, right, top bottom), the
- * anchors support text rendering properties (text-align, text-baseline). Text is
- * rendered to appear inside the area polygon.
- *
- * <p>To facilitate stacking of areas, the anchors are defined in terms of their
- * opposite edge. For example, the top anchor defines the bottom property, such
- * that the area grows upwards; the bottom anchor instead defines the top
- * property, such that the area grows downwards. Of course, in general it is
- * more robust to use panels and the cousin accessor to define stacked area
- * marks; see {@link pv.Mark#scene} for an example.
- *
- * @param {string} name the anchor name; either a string or a property function.
- * @returns {pv.Anchor}
- */
-pv.Area.prototype.anchor = function(name) {
-  var area = this;
-  return pv.Mark.prototype.anchor.call(this, name)
-    .left(function() {
-        switch (this.name()) {
-          case "bottom":
-          case "top":
-          case "center": return area.left() + area.width() / 2;
-          case "right": return area.left() + area.width();
-        }
-        return null;
-      })
-    .right(function() {
-        switch (this.name()) {
-          case "bottom":
-          case "top":
-          case "center": return area.right() + area.width() / 2;
-          case "left": return area.right() + area.width();
-        }
-        return null;
-      })
-    .top(function() {
-        switch (this.name()) {
-          case "left":
-          case "right":
-          case "center": return area.top() + area.height() / 2;
-          case "bottom": return area.top() + area.height();
-        }
-        return null;
-      })
-    .bottom(function() {
-        switch (this.name()) {
-          case "left":
-          case "right":
-          case "center": return area.bottom() + area.height() / 2;
-          case "top": return area.bottom() + area.height();
-        }
-        return null;
-      })
-    .textAlign(function() {
-        switch (this.name()) {
-          case "bottom":
-          case "top":
-          case "center": return "center";
-          case "right": return "right";
-        }
-        return "left";
-      })
-    .textBaseline(function() {
-        switch (this.name()) {
-          case "right":
-          case "left":
-          case "center": return "middle";
-          case "top": return "top";
-        }
-        return "bottom";
-      });
-};
-
-/**
- * @private Overrides the default behavior of {@link pv.Mark.buildImplied} such
- * that the width and height are set to zero if null.
- *
- * @param s a node in the scene graph; the instance of the mark to build.
- */
+/** @private Sets width and height to zero if null. */
 pv.Area.prototype.buildImplied = function(s) {
   if (s.height == null) s.height = 0;
   if (s.width == null) s.width = 0;
@@ -6806,95 +7003,6 @@ pv.Bar.prototype.defaults = new pv.Bar()
     .extend(pv.Mark.prototype.defaults)
     .lineWidth(1.5)
     .fillStyle(pv.Colors.category20().by(pv.parent));
-
-/**
- * Constructs a new bar anchor with default properties. Bars support five
- * different anchors:<ul>
- *
- * <li>top
- * <li>left
- * <li>center
- * <li>bottom
- * <li>right
- *
- * </ul>In addition to positioning properties (left, right, top bottom), the
- * anchors support text rendering properties (text-align, text-baseline). Text
- * is rendered to appear inside the bar.
- *
- * <p>To facilitate stacking of bars, the anchors are defined in terms of their
- * opposite edge. For example, the top anchor defines the bottom property, such
- * that the bar grows upwards; the bottom anchor instead defines the top
- * property, such that the bar grows downwards. Of course, in general it is more
- * robust to use panels and the cousin accessor to define stacked bars; see
- * {@link pv.Mark#scene} for an example.
- *
- * <p>Bar anchors also "smartly" specify position properties based on whether
- * the derived mark type supports the width and height properties. If the
- * derived mark type does not support these properties (e.g., dots), the
- * position will be centered on the corresponding edge. Otherwise (e.g., bars),
- * the position will be in the opposite side.
- *
- * @param {string} name the anchor name; either a string or a property function.
- * @returns {pv.Anchor}
- */
-pv.Bar.prototype.anchor = function(name) {
-  var bar = this;
-  return pv.Mark.prototype.anchor.call(this, name)
-    .left(function() {
-        switch (this.name()) {
-          case "bottom":
-          case "top":
-          case "center": return bar.left() + (this.properties.width ? 0 : (bar.width() / 2));
-          case "right": return bar.left() + bar.width();
-        }
-        return null;
-      })
-    .right(function() {
-        switch (this.name()) {
-          case "bottom":
-          case "top":
-          case "center": return bar.right() + (this.properties.width ? 0 : (bar.width() / 2));
-          case "left": return bar.right() + bar.width();
-        }
-        return null;
-      })
-    .top(function() {
-        switch (this.name()) {
-          case "left":
-          case "right":
-          case "center": return bar.top() + (this.properties.height ? 0 : (bar.height() / 2));
-          case "bottom": return bar.top() + bar.height();
-        }
-        return null;
-      })
-    .bottom(function() {
-        switch (this.name()) {
-          case "left":
-          case "right":
-          case "center": return bar.bottom() + (this.properties.height ? 0 : (bar.height() / 2));
-          case "top": return bar.bottom() + bar.height();
-        }
-        return null;
-      })
-    .textAlign(function() {
-        switch (this.name()) {
-          case "bottom":
-          case "top":
-          case "center": return "center";
-          case "right": return "right";
-        }
-        return "left";
-      })
-    .textBaseline(function() {
-        switch (this.name()) {
-          case "right":
-          case "left":
-          case "center": return "middle";
-          case "top": return "top";
-        }
-        return "bottom";
-      });
-};
 /**
  * Constructs a new dot mark with default properties. Dots are not typically
  * constructed directly, but by adding to a panel or an existing mark via
@@ -6917,6 +7025,7 @@ pv.Dot = function() {
 
 pv.Dot.prototype = pv.extend(pv.Mark)
     .property("size", Number)
+    .property("radius", Number)
     .property("shape", String)
     .property("angle", Number)
     .property("lineWidth", Number)
@@ -7031,45 +7140,37 @@ pv.Dot.prototype.defaults = new pv.Dot()
  * @returns {pv.Anchor}
  */
 pv.Dot.prototype.anchor = function(name) {
-  var dot = this;
+  var target = this;
   return pv.Mark.prototype.anchor.call(this, name)
-    .left(function(d) {
+    .left(function() {
+        var s = target.instance();
         switch (this.name()) {
           case "bottom":
           case "top":
-          case "center": return dot.left();
-          case "right": return dot.left() + dot.radius();
+          case "center": return s.left;
+          case "right": return s.left + s.radius;
         }
         return null;
       })
-    .right(function(d) {
-        switch (this.name()) {
-          case "bottom":
-          case "top":
-          case "center": return dot.right();
-          case "left": return dot.right() + dot.radius();
-        }
-        return null;
+    .right(function() {
+        var s = target.instance();
+        return this.name() == "left" ? s.right + s.radius : null;
       })
-    .top(function(d) {
+    .top(function() {
+        var s = target.instance();
         switch (this.name()) {
           case "left":
           case "right":
-          case "center": return dot.top();
-          case "bottom": return dot.top() + dot.radius();
+          case "center": return s.top;
+          case "bottom": return s.top + s.radius;
         }
         return null;
       })
-    .bottom(function(d) {
-        switch (this.name()) {
-          case "left":
-          case "right":
-          case "center": return dot.bottom();
-          case "top": return dot.bottom() + dot.radius();
-        }
-        return null;
+    .bottom(function() {
+        var s = target.instance();
+        return this.name() == "top" ? s.bottom + s.radius : null;
       })
-    .textAlign(function(d) {
+    .textAlign(function() {
         switch (this.name()) {
           case "left": return "right";
           case "bottom":
@@ -7078,7 +7179,7 @@ pv.Dot.prototype.anchor = function(name) {
         }
         return "left";
       })
-    .textBaseline(function(d) {
+    .textBaseline(function() {
         switch (this.name()) {
           case "right":
           case "left":
@@ -7089,14 +7190,11 @@ pv.Dot.prototype.anchor = function(name) {
       });
 };
 
-/**
- * Returns the radius of the dot, which is defined to be the square root of the
- * {@link #size} property.
- *
- * @returns {number} the radius.
- */
-pv.Dot.prototype.radius = function() {
-  return Math.sqrt(this.size());
+/** @private Sets radius based on size or vice versa. */
+pv.Dot.prototype.buildImplied = function(s) {
+  if (s.radius == null) s.radius = Math.sqrt(s.size);
+  else if (s.size == null) s.size = s.radius * s.radius;
+  pv.Mark.prototype.buildImplied.call(this, s);
 };
 /**
  * Constructs a new label mark with default properties. Labels are not typically
@@ -7245,6 +7343,7 @@ pv.Label.prototype.type = "label";
  */
 pv.Label.prototype.defaults = new pv.Label()
     .extend(pv.Mark.prototype.defaults)
+    .events("none")
     .text(pv.identity)
     .font("10px sans-serif")
     .textAngle(0)
@@ -7329,8 +7428,6 @@ pv.Line.prototype.type = "line";
  * functions (i.e., step functions), either "step-before" or "step-after" can be
  * specified. To draw a clockwise circular arc between points, specify "polar".
  *
- * <p>Note: this property is currently supported only on non-segmented lines.
- *
  * <p>This property is <i>fixed</i>. See {@link pv.Mark}.
  *
  * @type string
@@ -7352,6 +7449,51 @@ pv.Line.prototype.defaults = new pv.Line()
 /** @private Reuse Area's implementation for segmented bind & build. */
 pv.Line.prototype.bind = pv.Area.prototype.bind;
 pv.Line.prototype.buildInstance = pv.Area.prototype.buildInstance;
+
+/**
+ * Constructs a new line anchor with default properties. Lines support five
+ * different anchors:<ul>
+ *
+ * <li>top
+ * <li>left
+ * <li>center
+ * <li>bottom
+ * <li>right
+ *
+ * </ul>In addition to positioning properties (left, right, top bottom), the
+ * anchors support text rendering properties (text-align, text-baseline). Text is
+ * rendered to appear outside the line. Note that this behavior is different
+ * from other mark anchors, which default to rendering text <i>inside</i> the
+ * mark.
+ *
+ * <p>For consistency with the other mark types, the anchor positions are
+ * defined in terms of their opposite edge. For example, the top anchor defines
+ * the bottom property, such that a bar added to the top anchor grows upward.
+ *
+ * @param {string} name the anchor name; either a string or a property function.
+ * @returns {pv.Anchor}
+ */
+pv.Line.prototype.anchor = function(name) {
+  return pv.Mark.prototype.anchor.call(this, name)
+    .textAlign(function(d) {
+        switch (this.name()) {
+          case "left": return "right";
+          case "bottom":
+          case "top":
+          case "center": return "center";
+          case "right": return "left";
+        }
+      })
+    .textBaseline(function(d) {
+        switch (this.name()) {
+          case "right":
+          case "left":
+          case "center": return "middle";
+          case "top": return "bottom";
+          case "bottom": return "top";
+        }
+      });
+};
 /**
  * Constructs a new rule with default properties. Rules are not typically
  * constructed directly, but by adding to a panel or an existing mark via
@@ -7477,34 +7619,9 @@ pv.Rule.prototype.defaults = new pv.Rule()
  * @param {string} name the anchor name; either a string or a property function.
  * @returns {pv.Anchor}
  */
-pv.Rule.prototype.anchor = function(name) {
-  return pv.Bar.prototype.anchor.call(this, name)
-    .textAlign(function(d) {
-        switch (this.name()) {
-          case "left": return "right";
-          case "bottom":
-          case "top":
-          case "center": return "center";
-          case "right": return "left";
-        }
-      })
-    .textBaseline(function(d) {
-        switch (this.name()) {
-          case "right":
-          case "left":
-          case "center": return "middle";
-          case "top": return "bottom";
-          case "bottom": return "top";
-        }
-      });
-};
+pv.Rule.prototype.anchor = pv.Line.prototype.anchor;
 
-/**
- * @private Overrides the default behavior of {@link pv.Mark.buildImplied} to
- * determine the orientation (vertical or horizontal) of the rule.
- *
- * @param s a node in the scene graph; the instance of the rule to build.
- */
+/** @private Sets width or height based on orientation. */
 pv.Rule.prototype.buildImplied = function(s) {
   var l = s.left, r = s.right, t = s.top, b = s.bottom;
 
@@ -7604,10 +7721,23 @@ pv.Panel.prototype.type = "panel";
  */
 
 /**
- * TODO overflow documentation
+ * Specifies whether child marks are clipped when they overflow this panel.
+ * This affects the clipping of all this panel's descendant marks.
  *
  * @type string
  * @name pv.Panel.prototype.overflow
+ * @see http://www.w3.org/TR/CSS2/visufx.html#overflow
+ */
+
+/**
+ * The transform to be applied to child marks. The default transform is
+ * identity, which has no effect. Note that the panel's own fill and stroke are
+ * not affected by the transform, and panel's transform only affects the
+ * <tt>scale</tt> of child marks, not the panel itself.
+ *
+ * @type pv.Transform
+ * @name pv.Panel.prototype.transform
+ * @see pv.Mark.prototype.scale
  */
 
 /**
@@ -7634,14 +7764,16 @@ pv.Panel.prototype.defaults = new pv.Panel()
 pv.Panel.prototype.anchor = function(name) {
 
   /* A "view" of this panel whose margins appear to be zero. */
-  function z() { return 0; }
-  z.prototype = pv.extend(this);
-  z.prototype.left = z.prototype.right = z.prototype.top = z.prototype.bottom = z;
+  var target = pv.extend(this);
+  target.parent = this;
+  target.instance = function() {
+      var s = pv.extend(this.parent.instance());
+      s.right = s.top = s.left = s.bottom = 0;
+      return s;
+    };
 
-  var anchor = pv.Bar.prototype.anchor.call(new z(), name)
+  return pv.Bar.prototype.anchor.call(target, name)
       .data(function(d) { return [d]; });
-  anchor.parent = this;
-  return anchor;
 };
 
 /**
@@ -7664,7 +7796,7 @@ pv.Panel.prototype.add = function(type) {
   return child;
 };
 
-/** @private TODO */
+/** @private Bind this panel, then any child marks recursively. */
 pv.Panel.prototype.bind = function() {
   pv.Mark.prototype.bind.call(this);
   for (var i = 0; i < this.children.length; i++) {
@@ -7682,12 +7814,15 @@ pv.Panel.prototype.bind = function() {
  */
 pv.Panel.prototype.buildInstance = function(s) {
   pv.Bar.prototype.buildInstance.call(this, s);
+  if (!s.visible) return;
   if (!s.children) s.children = [];
 
   /*
-   * The default index should be cleared as we recurse into child marks. It will
-   * be reset to the current index when the next panel instance is built.
+   * Multiply the current scale factor by this panel's transform. Also clear the
+   * default index as we recurse into child marks; it will be reset to the
+   * current index when the next panel instance is built.
    */
+  var scale = this.scale * s.transform.k, child, n = this.children.length;
   pv.Mark.prototype.index = -1;
 
   /*
@@ -7696,9 +7831,11 @@ pv.Panel.prototype.buildInstance = function(s) {
    * existing scene graph, such that properties from the previous build can be
    * reused; this is largely to facilitate the recycling of SVG elements.
    */
-  for (var i = 0; i < this.children.length; i++) {
-    this.children[i].scene = s.children[i]; // possibly undefined
-    this.children[i].build();
+  for (var i = 0; i < n; i++) {
+    child = this.children[i];
+    child.scene = s.children[i]; // possibly undefined
+    child.scale = scale;
+    child.build();
   }
 
   /*
@@ -7707,13 +7844,15 @@ pv.Panel.prototype.buildInstance = function(s) {
    * remain on the child nodes because this panel (or a parent panel) may be
    * instantiated multiple times!
    */
-  for (var i = 0; i < this.children.length; i++) {
-    s.children[i] = this.children[i].scene;
-    delete this.children[i].scene;
+  for (var i = 0; i < n; i++) {
+    child = this.children[i];
+    s.children[i] = child.scene;
+    delete child.scene;
+    delete child.scale;
   }
 
-  /* Delete any expired child scenes, should child marks have been removed. */
-  s.children.length = this.children.length;
+  /* Delete any expired child scenes. */
+  s.children.length = n;
 };
 
 /**
@@ -7765,30 +7904,22 @@ pv.Panel.prototype.buildImplied = function(s) {
     } else {
       var cache = this.$canvas || (this.$canvas = []);
       if (!(c = cache[this.index])) {
-        c = cache[this.index] = document.createElement(pv.renderer() == "svgweb" ? "div" : "span"); // SVGWeb requires a div, not a span
-        this.$dom // script element for text/javascript+protovis
-            ? this.$dom.parentNode.insertBefore(c, this.$dom)
-            : lastElement().appendChild(c);
+        c = cache[this.index] =  document.createElement(pv.renderer() == "svgweb" ? "div" : "span"); // SVGWeb requires a div, not a span
+        if (this.$dom) { // script element for text/javascript+protovis
+          this.$dom.parentNode.insertBefore(c, this.$dom);
+        } else { // find the last element in the body
+          var n = document.body;
+          while (n.lastChild && n.lastChild.tagName) n = n.lastChild;
+          if (n != document.body) n = n.parentNode;
+          n.appendChild(c);
+        }
       }
     }
     s.canvas = c;
   }
   if (!s.transform) s.transform = pv.Transform.identity;
-  pv.Bar.prototype.buildImplied.call(this, s);
+  pv.Mark.prototype.buildImplied.call(this, s);
 };
-
-/**
- * @private Returns the last element in the current document's body. The canvas
- * element is appended to this last element if another DOM element has not
- * already been specified via the <tt>$dom</tt> field.
- */
-function lastElement() {
-  var node = document.body;
-  while (node.lastChild && node.lastChild.tagName) {
-    node = node.lastChild;
-  }
-  return (node == document.body) ? node : node.parentNode;
-}
 /**
  * Constructs a new dot mark with default properties. Images are not typically
  * constructed directly, but by adding to a panel or an existing mark via
@@ -8005,66 +8136,57 @@ pv.Wedge.prototype.midAngle = function() {
  * @returns {pv.Anchor}
  */
 pv.Wedge.prototype.anchor = function(name) {
-  var w = this;
+  function partial(s) { return s.innerRadius || s.angle < 2 * Math.PI; }
+  function midRadius(s) { return (s.innerRadius + s.outerRadius) / 2; }
+  function midAngle(s) { return (s.startAngle + s.endAngle) / 2; }
+  var target = this;
   return pv.Mark.prototype.anchor.call(this, name)
     .left(function() {
-        switch (this.name()) {
-          case "outer": return w.left() + w.outerRadius() * Math.cos(w.midAngle());
-          case "inner": return w.left() + w.innerRadius() * Math.cos(w.midAngle());
-          case "start": return w.left() + w.midRadius() * Math.cos(w.startAngle());
-          case "center": return w.left() + w.midRadius() * Math.cos(w.midAngle());
-          case "end": return w.left() + w.midRadius() * Math.cos(w.endAngle());
+        var s = target.instance();
+        if (partial(s)) switch (this.name()) {
+          case "outer": return s.left + s.outerRadius * Math.cos(midAngle(s));
+          case "inner": return s.left + s.innerRadius * Math.cos(midAngle(s));
+          case "start": return s.left + midRadius(s) * Math.cos(s.startAngle);
+          case "center": return s.left + midRadius(s) * Math.cos(midAngle(s));
+          case "end": return s.left + midRadius(s) * Math.cos(s.endAngle);
         }
-      })
-    .right(function() {
-        switch (this.name()) {
-          case "outer": return w.right() + w.outerRadius() * Math.cos(w.midAngle());
-          case "inner": return w.right() + w.innerRadius() * Math.cos(w.midAngle());
-          case "start": return w.right() + w.midRadius() * Math.cos(w.startAngle());
-          case "center": return w.right() + w.midRadius() * Math.cos(w.midAngle());
-          case "end": return w.right() + w.midRadius() * Math.cos(w.endAngle());
-        }
+        return s.left;
       })
     .top(function() {
-        switch (this.name()) {
-          case "outer": return w.top() + w.outerRadius() * Math.sin(w.midAngle());
-          case "inner": return w.top() + w.innerRadius() * Math.sin(w.midAngle());
-          case "start": return w.top() + w.midRadius() * Math.sin(w.startAngle());
-          case "center": return w.top() + w.midRadius() * Math.sin(w.midAngle());
-          case "end": return w.top() + w.midRadius() * Math.sin(w.endAngle());
+        var s = target.instance();
+        if (partial(s)) switch (this.name()) {
+          case "outer": return s.top + s.outerRadius * Math.sin(midAngle(s));
+          case "inner": return s.top + s.innerRadius * Math.sin(midAngle(s));
+          case "start": return s.top + midRadius(s) * Math.sin(s.startAngle);
+          case "center": return s.top + midRadius(s) * Math.sin(midAngle(s));
+          case "end": return s.top + midRadius(s) * Math.sin(s.endAngle);
         }
-      })
-    .bottom(function() {
-        switch (this.name()) {
-          case "outer": return w.bottom() + w.outerRadius() * Math.sin(w.midAngle());
-          case "inner": return w.bottom() + w.innerRadius() * Math.sin(w.midAngle());
-          case "start": return w.bottom() + w.midRadius() * Math.sin(w.startAngle());
-          case "center": return w.bottom() + w.midRadius() * Math.sin(w.midAngle());
-          case "end": return w.bottom() + w.midRadius() * Math.sin(w.endAngle());
-        }
+        return s.top;
       })
     .textAlign(function() {
-        switch (this.name()) {
-          case "outer": return pv.Wedge.upright(w.midAngle()) ? "right" : "left";
-          case "inner": return pv.Wedge.upright(w.midAngle()) ? "left" : "right";
+        var s = target.instance();
+        if (partial(s)) switch (this.name()) {
+          case "outer": return pv.Wedge.upright(midAngle(s)) ? "right" : "left";
+          case "inner": return pv.Wedge.upright(midAngle(s)) ? "left" : "right";
         }
         return "center";
       })
     .textBaseline(function() {
-        switch (this.name()) {
-          case "start": return pv.Wedge.upright(w.startAngle()) ? "top" : "bottom";
-          case "end": return pv.Wedge.upright(w.endAngle()) ? "bottom" : "top";
+        var s = target.instance();
+        if (partial(s)) switch (this.name()) {
+          case "start": return pv.Wedge.upright(s.startAngle) ? "top" : "bottom";
+          case "end": return pv.Wedge.upright(s.endAngle) ? "bottom" : "top";
         }
         return "middle";
       })
     .textAngle(function() {
-        var a = 0;
-        switch (this.name()) {
+        var s = target.instance(), a = 0;
+        if (partial(s)) switch (this.name()) {
           case "center":
           case "inner":
-          case "outer": a = w.midAngle(); break;
-          case "start": a = w.startAngle(); break;
-          case "end": a = w.endAngle(); break;
+          case "outer": a = midAngle(s); break;
+          case "start": a = s.startAngle; break;
+          case "end": a = s.endAngle; break;
         }
         return pv.Wedge.upright(a) ? a : (a + Math.PI);
       });
@@ -8085,21 +8207,10 @@ pv.Wedge.upright = function(angle) {
   return (angle < Math.PI / 2) || (angle > 3 * Math.PI / 2);
 };
 
-/**
- * @private Overrides the default behavior of {@link pv.Mark.buildImplied} such
- * that the end angle is computed from the start angle and angle (angular span)
- * if not specified.
- *
- * @param s a node in the scene graph; the instance of the wedge to build.
- */
+/** @private Sets angle based on endAngle or vice versa. */
 pv.Wedge.prototype.buildImplied = function(s) {
-  /*
-   * TODO If the angle or endAngle is updated by an event handler, the implied
-   * properties won't recompute correctly, so this will lead to potentially
-   * buggy redraw. How to re-evaluate implied properties on update?
-   */
-  if (s.endAngle == null) s.endAngle = s.startAngle + s.angle;
   if (s.angle == null) s.angle = s.endAngle - s.startAngle;
+  else if (s.endAngle == null) s.endAngle = s.startAngle + s.angle;
   pv.Mark.prototype.buildImplied.call(this, s);
 };
 /**
@@ -8628,8 +8739,8 @@ pv.Force.drag = function(k) {
 
   force.apply = function(particles) {
     if (k) for (var p = particles; p; p = p.next) {
-      p.fx -= k * p.vx;
-      p.fy -= k * p.vy;
+      p.fx = k * (p.fx - p.x + p.px);
+      p.fy = k * (p.fy - p.y + p.py);
     }
   };
 
@@ -8638,6 +8749,7 @@ pv.Force.drag = function(k) {
 pv.Force.spring = function(k) {
   var d = .1, // default damping factor
       l = 20, // default rest length
+      links, // links on which to apply spring forces
       kl, // per-spring normalization
       force = {};
 
@@ -8833,11 +8945,342 @@ pv.Constraint.position = function(f) {
 
   return constraint;
 };
+pv.Constraint.bound = function() {
+  var constraint = {},
+      x,
+      y;
+
+  constraint.x = function(min, max) {
+    if (arguments.length) {
+      x = {min: Math.min(min, max), max: Math.max(min, max)};
+      return this;
+    }
+    return x;
+  };
+
+  constraint.y = function(min, max) {
+    if (arguments.length) {
+      y = {min: Math.min(min, max), max: Math.max(min, max)};
+      return this;
+    }
+    return y;
+  };
+
+  constraint.apply = function(particles) {
+    if (x) for (var p = particles; p; p = p.next) {
+      p.x = p.x < x.min ? x.min : (p.x > x.max ? x.max : p.x);
+    }
+    if (y) for (var p = particles; p; p = p.next) {
+      p.y = p.y < y.min ? y.min : (p.y > y.max ? y.max : p.y);
+    }
+  };
+
+  return constraint;
+};
 /**
  * @ignore
- * @namespace
+ * @class
  */
-pv.Layout = {};
+pv.Layout = function() {
+  pv.Mark.call(this);
+};
+
+pv.Layout.prototype = pv.extend(pv.Mark);
+
+/** @private Defines a local property with the specified name and cast. */
+pv.Layout.prototype.property = function(name, cast) {
+  this.propertyMethod(name, true, cast);
+  return this;
+};
+
+/** @private Wrap the data property with an initialization hook. */
+pv.Layout.prototype.bind = function() {
+  pv.Mark.prototype.bind.call(this);
+  var binds = this.binds, data = binds.data, value = data.value;
+  binds.data = {
+    id: data.id,
+    type: data.type | 1,
+    value: data.type & 1
+        ? function() { var x = value.apply(this, arguments); this.init(x); return x; }
+        : function() { this.init(value); return value; }
+  };
+};
+
+/** @private Initialization hook after data and defs have been evaluated. */
+pv.Layout.prototype.init = function() {};
+/** @class Abstract layout for networks. */
+pv.Layout.Network = function() {
+  pv.Layout.call(this);
+  var that = this;
+
+  /**
+   * The node prototype. This prototype is intended to be used with a Dot mark
+   * in conjunction with the link prototype.
+   *
+   * @type pv.Mark
+   * @name pv.Layout.Network.prototype.node
+   */
+  this.node = new pv.Mark()
+      .data(function() { return that.nodes(); })
+      .strokeStyle("#1f77b4")
+      .fillStyle("#fff")
+      .left(function(n) { return n.x; })
+      .top(function(n) { return n.y; });
+
+  /** @private Propagate layout mark references to node children. */
+  this.node.add = function(type) {
+      var mark = that.parent.add(type).extend(this);
+      mark.link = that.link;
+      mark.node = that.node;
+      mark.label = that.label;
+      return mark;
+    };
+
+  /**
+   * The link prototype, which renders edges between source nodes and target
+   * nodes. This prototype is intended to be used with a Line mark in
+   * conjunction with the node prototype.
+   *
+   * @type pv.Mark
+   * @name pv.Layout.Network.prototype.link
+   */
+  this.link = new pv.Mark()
+      .extend(this.node)
+      .data(function(p) { return [p.sourceNode, p.targetNode]; })
+      .fillStyle(null)
+      .lineWidth(function(d, p) { return p.linkValue * 1.5; })
+      .strokeStyle("rgba(0,0,0,.2)");
+
+  /** @private Propagate layout mark references to link children. */
+  this.link.add = function(type) {
+      var mark = that.parent.add(pv.Panel)
+          .data(function() { return that.links(); })
+          .add(type).extend(this);
+      mark.link = that.link;
+      mark.node = that.node;
+      mark.label = that.label;
+      return mark;
+    };
+
+  /**
+   * The node label prototype, which renders the node name adjacent to the node.
+   * This prototype is provided as an alternative to using the anchor on the
+   * node mark; it is primarily intended to be used with radial node-link
+   * layouts, since it provides a convenient mechanism to set the text angle.
+   *
+   * @type pv.Mark
+   * @name pv.Layout.Network.prototype.label
+   */
+  this.label = new pv.Mark()
+      .extend(this.node)
+      .textMargin(7)
+      .textBaseline("middle")
+      .text(function(n) { return n.nodeName || n.nodeValue; })
+      .textAngle(function(n) {
+          var a = n.angle;
+          return pv.Wedge.upright(a) ? a : (a + Math.PI);
+        })
+      .textAlign(function(n) {
+          return pv.Wedge.upright(n.angle) ? "left" : "right";
+        });
+
+  /** @private Propagate layout mark references to label children. */
+  this.label.add = this.node.add;
+};
+
+/** @private Transform nodes and links on cast. */
+pv.Layout.Network.prototype = pv.extend(pv.Layout)
+    .property("nodes", function(v) {
+        return v.map(function(d, i) {
+            if (typeof d != "object") d = {nodeValue: d};
+            d.index = i;
+            d.linkDegree = 0;
+            return d;
+          });
+      })
+    .property("links", function(v) {
+        return v.map(function(d) {
+            if (isNaN(d.linkValue)) d.linkValue = isNaN(d.value) ? 1 : d.value;
+            return d;
+          });
+      });
+
+/** @private If the nodes property is changed, unlock the links too. */
+pv.Layout.Network.prototype.bind = function() {
+  pv.Layout.prototype.bind.call(this);
+  var binds = this.binds,
+      nodes = binds.properties.nodes,
+      links = binds.properties.links;
+  if (links && (nodes.id > links.id)) links.id = nodes.id;
+};
+
+/** @private Locks node and links after initialization. */
+pv.Layout.Network.prototype.init = function() {
+  var defs = this.scene.defs;
+  if (defs.nodes.id) return true;
+  defs.links.id = defs.nodes.id = pv.id();
+
+  /* Compute link degrees; map source and target indexes to nodes. */
+  var nodes = this.nodes();
+  this.links().forEach(function(d) {
+      var s = d.sourceNode || (d.sourceNode = nodes[d.source]),
+          t = d.targetNode || (d.targetNode = nodes[d.target]),
+          v = d.linkValue;
+      s.linkDegree += v;
+      t.linkDegree += v;
+    });
+};
+/** @class Abstract layout for hierarchies. */
+pv.Layout.Hierarchy = function() {
+  pv.Layout.Network.call(this);
+  this.link.strokeStyle("#ccc");
+};
+
+pv.Layout.Hierarchy.prototype = pv.extend(pv.Layout.Network);
+
+/** @private Alias the data property to nodes. */
+pv.Layout.Hierarchy.prototype.data = pv.Layout.Hierarchy.prototype.nodes;
+
+/** @private Register an implicit links property. */
+pv.Layout.Hierarchy.prototype.bind = function() {
+  pv.Layout.Network.prototype.bind.call(this);
+  var binds = this.binds;
+  if (!binds.properties.links) {
+    var p = this.propertyValue("links", pv.Layout.Hierarchy.links);
+    p.type = 1;
+    binds.defs.push(p);
+  }
+};
+
+/**
+ * The default links property; computes links using the <tt>parentNode</tt>
+ * attribute.
+ */
+pv.Layout.Hierarchy.links = function() {
+  return this.nodes()
+      .filter(function(n) { return n.parentNode; })
+      .map(function(n) {
+          return {
+              sourceNode: n,
+              targetNode: n.parentNode,
+              linkValue: 1
+            };
+      });
+};
+
+/** @private */
+pv.Layout.Hierarchy.Fill = {
+
+  /** @private */
+  constructor: function() {
+    var node = this.node
+        .strokeStyle("#fff")
+        .fillStyle("#ccc")
+        .width(function(n) { return n.dx; })
+        .height(function(n) { return n.dy; })
+        .innerRadius(function(n) { return n.innerRadius; })
+        .outerRadius(function(n) { return n.outerRadius; })
+        .startAngle(function(n) { return n.startAngle; })
+        .angle(function(n) { return n.angle; });
+
+    /** @private Adding to this layout implicitly adds to this node. */
+    this.add = function(type) { return this.parent.add(type).extend(node); };
+
+    /* Now hide references to inherited marks. */
+    delete this.node;
+    delete this.label;
+    delete this.link;
+  },
+
+  /** @private */
+  init: function() {
+    var nodes = this.nodes(),
+        orient = this.orient(),
+        w = this.parent.width(),
+        h = this.parent.height(),
+        r = Math.min(w, h) / 2,
+        ds = -nodes[0].minDepth;
+
+    /** @private Scales the specified depth for a space-filling layout. */
+    function scale(d, ds) {
+      return (d + ds) / (1 + ds);
+    }
+
+    /** @private */
+    function x(n) {
+      switch (orient) {
+        case "left": return scale(n.minDepth, ds) * w;
+        case "right": return (1 - scale(n.maxDepth, ds)) * w;
+        case "top": return n.minBreadth * w;
+        case "bottom": return (1 - n.maxBreadth) * w;
+        case "radial": return w / 2;
+      }
+    }
+
+    /** @private */
+    function y(n) {
+      switch (orient) {
+        case "left": return n.minBreadth * h;
+        case "right": return (1 - n.maxBreadth) * h;
+        case "top": return scale(n.minDepth, ds) * h;
+        case "bottom": return (1 - scale(n.maxDepth, ds)) * h;
+        case "radial": return h / 2;
+      }
+    }
+
+    /** @private */
+    function dx(n) {
+      switch (orient) {
+        case "left":
+        case "right": return (n.maxDepth - n.minDepth) / (1 + ds) * w;
+        case "top":
+        case "bottom": return (n.maxBreadth - n.minBreadth) * w;
+      }
+    }
+
+    /** @private */
+    function dy(n) {
+      switch (orient) {
+        case "left":
+        case "right": return (n.maxBreadth - n.minBreadth) * h;
+        case "top":
+        case "bottom": return (n.maxDepth - n.minDepth) / (1 + ds) * h;
+      }
+    }
+
+    /** @private */
+    function innerRadius(n) {
+      return Math.max(0, scale(n.minDepth, ds / 2)) * r;
+    }
+
+    /** @private */
+    function outerRadius(n) {
+      return scale(n.maxDepth, ds / 2) * r;
+    }
+
+    /** @private */
+    function startAngle(n) {
+      return (n.parentNode ? n.minBreadth - .25 : 0) * 2 * Math.PI;
+    }
+
+    /** @private */
+    function angle(n) {
+      return (n.parentNode ? n.maxBreadth - n.minBreadth : 1) * 2 * Math.PI;
+    }
+
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
+      n.x = x(n);
+      n.y = y(n);
+      n.dx = dx(n);
+      n.dy = dy(n);
+      n.innerRadius = innerRadius(n);
+      n.outerRadius = outerRadius(n);
+      n.startAngle = startAngle(n);
+      n.angle = angle(n);
+    }
+  }
+};
 /**
  * Returns a new grid layout.
  *
@@ -8861,118 +9304,361 @@ pv.Layout = {};
  * array is a two-dimensional array of values in the range [0,1], a simple
  * heatmap can be generated as:
  *
- * <pre>.add(pv.Bar)
- *   .extend(pv.Layout.grid(array))
+ * <pre>.add(pv.Layout.Grid)
+ *   .data(arrays)
+ * .add(pv.Bar)
  *   .fillStyle(pv.ramp("white", "black"))</pre>
  *
  * By default, the grid fills the full width and height of the parent panel.
  *
- * @param {array[]} arrays an array of arrays.
+ * @param {array[]} rows an array of arrays.
  * @returns {pv.Layout.grid} a grid layout.
  */
-pv.Layout.grid = function(arrays) {
-  var rows = arrays.length, cols = arrays[0].length;
+pv.Layout.Grid = function() {
+  pv.Layout.call(this);
+  var that = this;
 
-  /** @private */
-  function w() { return this.parent.width() / cols; }
+  /* Set the default data method before defining the cast. */
+  this.data(function(d) {
+      return pv.range(that.rows() * that.cols()).map(function() { return d; });
+    });
 
-  /** @private */
-  function h() { return this.parent.height() / rows; }
+  /* When the data property is set, implicitly change rows and cols. */
+  this.propertyMethod("data", false, function(v) {
+      that.rows(v.length).cols(v[0] ? v[0].length : 0);
+      return pv.blend(v);
+    });
 
-  return new pv.Mark()
-      .data(pv.blend(arrays))
-      .left(function() { return w.call(this) * (this.index % cols); })
-      .top(function() { return h.call(this) * Math.floor(this.index / cols); })
-      .width(w)
-      .height(h);
+  this.rows(1)
+      .cols(1)
+      .width(function() { return this.parent.width() / this.cols(); })
+      .height(function() { return this.parent.height() / this.rows(); })
+      .left(function() { return this.width() * (this.index % this.cols()); })
+      .top(function() { return this.height() * Math.floor(this.index / this.cols()); });
 };
+
+pv.Layout.Grid.prototype = pv.extend(pv.Layout)
+    .property("rows", Number)
+    .property("cols", Number);
+
+/**
+ * Sets the number of rows. This method can be used to replicate the enclosing
+ * panel data in the abscence of a data property. Note that if the data property
+ * is specified, it takes priority over the rows property.
+ *
+ * @param {number} v the number of rows.
+ * @function
+ * @name pv.Layout.grid.prototype.rows
+ * @returns {pv.Layout.grid} this.
+ */
+
+/**
+ * Sets the number of columns. This method can be used to replicate the
+ * enclosing panel data in the abscence of a data property. Note that if the
+ * data property is specified, it takes priority over the columns property.
+ *
+ * @param {number} v the number of columns.
+ * @function
+ * @name pv.Layout.grid.prototype.cols
+ * @returns {pv.Layout.grid} this.
+ */
+
+/**
+ * Sets the data. The data should be specified as an array of arrays; this array
+ * will be blended such that child marks will see elements of the subarrays.
+ * Setting the data associated with this grid implicitly sets the number of rows
+ * and columns.
+ *
+ * @param {array[]} v the new data.
+ * @function
+ * @name pv.Layout.grid.prototype.data
+ * @returns {pv.Layout.grid} this.
+ */
 /**
  * Returns a new stack layout.
  *
- * @class A layout for stacking marks vertically or horizontally, using the
- * <i>cousin</i> instance. This layout is designed to be used for one of the
- * four positional properties in the box model, and changes behavior depending
- * on the property being evaluated:<ul>
+ * @class A layout for stacking marks vertically or horizontally. For example,
  *
- * <li>bottom: cousin.bottom + cousin.height
- * <li>top: cousin.top + cousin.height
- * <li>left: cousin.left + cousin.width
- * <li>right: cousin.right + cousin.width
- *
- * </ul>If no cousin instance is available (for example, for first instance),
- * the specified offset is used. If no offset is specified, zero is used. For
- * example,
- *
- * <pre>new pv.Panel()
- *     .width(150).height(150)
- *   .add(pv.Panel)
+ * <pre>vis.add(pv.Layout.Stack)
  *     .data([[1, 1.2, 1.7, 1.5, 1.7],
  *            [.5, 1, .8, 1.1, 1.3],
  *            [.2, .5, .8, .9, 1]])
  *   .add(pv.Area)
- *     .data(function(d) d)
- *     .bottom(pv.Layout.stack())
  *     .height(function(d) d * 40)
- *     .left(function() this.index * 35)
- *   .root.render();</pre>
+ *     .left(function() this.index * 35);</pre>
  *
  * specifies a vertically-stacked area chart.
  *
- * @returns {pv.Layout.stack} a stack property function.
- * @see pv.Mark#cousin
+ * @returns {pv.Layout.Stack} a stack layout.
  */
-pv.Layout.stack = function() {
-  /** @private */
-  var offset = function() { return 0; };
+pv.Layout.Stack = function() {
+  pv.Layout.call(this);
+  var that = this;
 
   /** @private */
-  function layout() {
-
-    /* Find the previous visible parent instance. */
-    var i = this.parent.index, p, c;
-    while ((i-- > 0) && !c) {
-      p = this.parent.scene[i];
-      if (p.visible) c = p.children[this.childIndex][this.index];
-    }
-
-    if (c) {
-      switch (property) {
-        case "bottom": return c.bottom + c.height;
-        case "top": return c.top + c.height;
-        case "left": return c.left + c.width;
-        case "right": return c.right + c.width;
-      }
-    }
-
-    return offset.apply(this, arguments);
-  }
+  var label = new pv.Mark()
+      .data(pv.identity)
+      .visible(function() {
+          return this.index == that.scene.$stack.max[this.parent.index];
+        })
+      .textBaseline("middle")
+      .textAlign("center");
 
   /**
-   * Sets the offset for this stack layout. The offset can either be specified
-   * as a function or as a constant. If a function, the function is invoked in
-   * the same context as a normal property function: <tt>this</tt> refers to the
-   * mark, and the arguments are the full data stack. By default the offset is
-   * zero.
-   *
-   * @function
-   * @name pv.Layout.stack.prototype.offset
-   * @param {function} f offset function, or constant value.
-   * @returns {pv.Layout.stack} this.
+   * Adds a mark of the specified type to a new panel, using this stack layout.
+   * Any positional properties defined on the returned mark will be evaluated
+   * immediately after the panel's data, allowing the layout to compute the
+   * implied offset.
    */
-  layout.offset = function(f) {
-      offset = (f instanceof Function) ? f : function() { return f; };
-      return this;
-    };
+  this.add = function(type) {
+      var mark = that.parent.add(pv.Panel)
+              .extend(that)
+              .data(function() {
+                  var data = that.scene.$stack.data;
+                  that.prebuild(data, this.children[0]);
+                  return data;
+                })
+              .visible(function() { return that.scene[this.index].visible; })
+            .add(type)
+              .data(pv.identity),
+          bind = mark.bind;
+      mark.bind = function() { that.prebind(bind, this); };
 
-  return layout;
+      /** @private Returns the target instance of the mark. */
+      function target() {
+        return mark.parent.scene[this.parent.index].children[0][this.index];
+      }
+
+      /** The label prototype; bound to the added mark. */
+      mark.label = new pv.Mark()
+          .extend(label)
+          .left(function() {
+              var s = target.call(this);
+              return s.left + s.width / 2;
+            })
+          .bottom(function() {
+              var s = target.call(this);
+              return s.bottom + s.height / 2;
+            });
+
+      /**
+       * Adds a label of the specified type (typically pv.Label) to a new panel
+       * using this stack layout. One label will be rendered per series, at the
+       * maximum value of the series.
+       */
+      mark.label.add = function(type) {
+          return that.parent.add(pv.Panel)
+              .data(function() { return that.scene.$stack.data; })
+            .add(type)
+              .extend(this);
+        };
+
+      return mark;
+    };
 };
-// TODO add `by` function for determining size (and children?)
+
+pv.Layout.Stack.prototype = pv.extend(pv.Layout)
+    .property("orient", String)
+    .property("order", String)
+    .property("offset", String);
+
+pv.Layout.Stack.prototype.defaults = new pv.Layout.Stack()
+    .extend(pv.Layout.prototype.defaults)
+    .orient("bottom")
+    .offset("zero");
+
+/** @private Capture the panel data on initialization. */
+pv.Layout.Stack.prototype.init = function(data) {
+  this.scene.$stack = {data: data};
+};
 
 /**
- * Returns a new treemap tree layout.
+ * @private Before the child is bound, capture the original positional property
+ * definitions so that the layout can use these properties to compute the
+ * offset.
+ */
+pv.Layout.Stack.prototype.prebind = function(bind, child) {
+  var o = child.binds ? child.binds.$stack : {};
+  bind.call(child);
+
+  /** @private The positional properties for dynamic substitution. */
+  var positionals = {
+    "left": 1,
+    "right": 1,
+    "top": 1,
+    "bottom": 1,
+    "width": 1,
+    "height": 1
+  };
+
+  /** @private Returns a constant property function for the specified value. */
+  function constant(x) {
+    return function() { return x; };
+  }
+
+  /* Override the positional properties with dynamics. */
+  var properties = child.binds.properties;
+  for (var name in positionals) {
+    var p = properties[name];
+    if (!p.original) { // ignore our dynamic binds
+      var d = o[name] = child.propertyValue(name, p.value);
+      d.type = p.type;
+      d.original = p.value;
+    }
+  }
+
+  /* Rebind the dynamic properties. */
+  bind.call(child);
+  child.binds.$stack = o;
+};
+
+/**
+ * @private Before the child is built, reassign the positional properties to the
+ * appropriate dynamic function, so as to lookup the computed offset.
+ */
+pv.Layout.Stack.prototype.prebuild = function(data, child) {
+  var orient = this.orient(),
+      horizontal = /^(top|bottom)$/.test(orient),
+      n = data.length,
+      m = data[0].length,
+      h = this.parent[horizontal ? "height" : "width"](),
+      x = [],
+      y = [],
+      dy = [],
+      z = [],
+      parent = child.parent,
+      properties = child.binds.$stack;
+
+  /* Find the property definitions for dynamic substitution. */
+  var pdy = properties[horizontal ? "height" : "width"],
+      px = horizontal ? properties.left : properties.top,
+      py = properties[orient];
+
+  /* If the x-property is null (the default), use the alternative. */
+  if (px.value == null) px = horizontal ? properties.right : properties.bottom;
+
+  /* Iterate over the data, evaluating the x and dy functions. */
+  var stack = pv.Mark.stack;
+  stack.unshift(null);
+  for (var i = 0; i < n; i++) {
+    dy[i] = [];
+    y[i] = [];
+    z[i] = this.scene[i].visible;
+    parent.index = i;
+    for (var j = 0; j < m; j++) {
+      stack[0] = data[i][j];
+      pv.Mark.prototype.index = child.index = j;
+      if (!i) x[j] = px.original.apply(child, stack);
+      dy[i][j] = z[i] ? pdy.original.apply(child, stack) : 0;
+    }
+  }
+  delete parent.index;
+  delete child.index;
+  stack.shift();
+
+  /* order */
+  var index;
+  switch (this.order()) {
+    case "inside-out": {
+      var max = dy.map(function(v) { return pv.max.index(v); }),
+          map = pv.range(n).sort(function(a, b) { return max[a] - max[b]; }),
+          sums = dy.map(function(v) { return pv.sum(v); }),
+          top = 0,
+          bottom = 0,
+          tops = [],
+          bottoms = [];
+      for (var i = 0; i < n; i++) {
+        var j = map[i];
+        if (top < bottom) {
+          top += sums[j];
+          tops.push(j);
+        } else {
+          bottom += sums[j];
+          bottoms.push(j);
+        }
+      }
+      index = bottoms.reverse().concat(tops);
+      break;
+    }
+    default: index = pv.range(n); break;
+  }
+
+  /* offset */
+  switch (this.offset()) {
+    case "silohouette": {
+      for (var j = 0; j < m; j++) {
+        var o = 0;
+        for (var i = 0; i < n; i++) o += dy[i][j];
+        y[index[0]][j] = (h - o) / 2;
+      }
+      break;
+    }
+    case "wiggle": {
+      var o = 0;
+      for (var i = 0; i < n; i++) o += dy[i][0];
+      y[index[0]][0] = o = (h - o) / 2;
+      for (var j = 1; j < m; j++) {
+        var s1 = 0, s2 = 0, dx = x[j] - x[j - 1];
+        for (var i = 0; i < n; i++) s1 += dy[i][j];
+        for (var i = 0; i < n; i++) {
+          var s3 = (dy[index[i]][j] - dy[index[i]][j - 1]) / (2 * dx);
+          for (var k = 0; k < i; k++) {
+            s3 += (dy[index[k]][j] - dy[index[k]][j - 1]) / dx;
+          }
+          s2 += s3 * dy[index[i]][j];
+        }
+        y[index[0]][j] = o -= s1 ? s2 / s1 * dx : 0;
+      }
+      break;
+    }
+    case "expand": {
+      var nz = pv.sum(z);
+      for (var j = 0; j < m; j++) {
+        y[index[0]][j] = 0;
+        var k = 0;
+        for (var i = 0; i < n; i++) k += dy[i][j];
+        if (k) {
+          k = h / k;
+          for (var i = 0; i < n; i++) dy[i][j] *= k;
+        } else {
+          k = h / nz;
+          for (var i = 0; i < n; i++) dy[i][j] = z[i] ? k : 0;
+        }
+      }
+      break;
+    }
+    default: {
+      for (var j = 0; j < m; j++) y[index[0]][j] = 0;
+      break;
+    }
+  }
+
+  /* Propagate the offset to the other series. */
+  for (var j = 0; j < m; j++) {
+    var o = y[index[0]][j];
+    for (var i = 1; i < n; i++) {
+      o += dy[index[i - 1]][j];
+      y[index[i]][j] = o;
+    }
+  }
+
+  /* Populate the maximum indices for labeling. */
+  this.scene.$stack.max = dy.map(function(array) {
+      return pv.max.index(array);
+    });
+
+  /* Substitute the dynamic properties so the child can build. */
+  px.type = py.type = pdy.type = 3;
+  px.value = function() { return x[this.index]; };
+  py.value = function() { return y[this.parent.index][this.index]; };
+  pdy.value = function() { return dy[this.parent.index][this.index]; };
+  return data;
+};
+/**
+ * Returns a new treemap layout.
  *
- * @class A tree layout in the form of an treemap. <img
- * src="../treemap.png" width="160" height="160" align="right"> Treemaps
+ * @class A tree layout in the form of an treemap.
+ * <img src="../treemap.png" width="160" height="160" align="right"> Treemaps
  * are a form of space-filling layout that represents nodes as boxes, with child
  * nodes placed within parent boxes. The size of each box is proportional to the
  * size of the node in the tree.
@@ -8980,88 +9666,63 @@ pv.Layout.stack = function() {
  * <p>This particular algorithm is taken from Bruls, D.M., C. Huizing, and
  * J.J. van Wijk, <a href="http://www.win.tue.nl/~vanwijk/stm.pdf">"Squarified
  * Treemaps"</a> in <i>Data Visualization 2000, Proceedings of the Joint
- * Eurographics and IEEE TCVG Sumposium on Visualization</i>, 2000,
- * pp. 33-42.
+ * Eurographics and IEEE TCVG Sumposium on Visualization</i>, 2000, pp. 33-42.
  *
- * <p>This tree layout is intended to be extended (see {@link pv.Mark#extend})
- * by a {@link pv.Bar}. The data property returns an array of nodes for use by
- * other property functions. The following node attributes are supported:
+ * <p>This tree layout is intended to be used with a {@link pv.Bar} or {@link
+ * pv.Panel}. The nodes will be populated with the following attributes:
  *
  * <ul>
- * <li><tt>left</tt> - the cell left position.
- * <li><tt>top</tt> - the cell top position.
+ * <li><tt>x</tt> - the cell left position.
+ * <li><tt>y</tt> - the cell top position.
  * <li><tt>width</tt> - the cell width.
  * <li><tt>height</tt> - the cell height.
  * <li><tt>depth</tt> - the node depth (tier; the root is 0).
- * <li><tt>keys</tt> - an array of string keys for the node.
- * <li><tt>size</tt> - the aggregate node size.
- * <li><tt>children</tt> - child nodes, if any.
- * <li><tt>data</tt> - the associated tree element, for leaf nodes.
  * </ul>
  *
- * To produce a default treemap layout, say:
- *
- * <pre>.add(pv.Bar)
- *   .extend(pv.Layout.treemap(tree))</pre>
- *
- * To display internal nodes, and color by depth, say:
- *
- * <pre>.add(pv.Bar)
- *   .extend(pv.Layout.treemap(tree).inset(10))
- *   .fillStyle(pv.Colors.category19().by(function(n) n.depth))</pre>
- *
- * The format of the <tt>tree</tt> argument is a hierarchical object whose leaf
- * nodes are numbers corresponding to their size. For an example, and
- * information on how to convert tabular data into such a tree, see
- * {@link pv.Tree}. If the leaf nodes are not numbers, a {@link #size} function
- * can be specified to override how the tree is interpreted. This size function
- * can also be used to transform the data.
- *
- * <p>By default, the treemap fills the full width and height of the parent
- * panel, and only leaf nodes are rendered. If an {@link #inset} is specified,
- * internal nodes will be rendered, each inset from their parent by the
- * specified margins. Rounding can be enabled using {@link #round}. Finally, an
- * optional root key can be specified using {@link #root} for convenience.
- *
- * @param tree a tree (an object) who leaf attributes have sizes.
- * @returns {pv.Layout.treemap} a tree layout.
+ * @returns {pv.Layout.Treemap} a treemap layout.
  */
-pv.Layout.treemap = function(tree) {
-  var keys = [], round, inset, sizeof = Number;
+pv.Layout.Treemap = function() {
+  pv.Layout.Hierarchy.call(this);
 
-  /** @private */
-  function rnd(i) {
-    return round ? Math.round(i) : i;
-  }
+  var node = this.node
+      .strokeStyle("#fff")
+      .fillStyle("rgba(31, 119, 180, .25)")
+      .width(function(n) { return n.dx; })
+      .height(function(n) { return n.dy; });
 
-  /** @private */
-  function accumulate(map) {
-    var node = {size: 0, children: [], keys: keys.slice()};
-    for (var key in map) {
-      var child = map[key], size = sizeof(child);
-      keys.push(key);
-      if (isNaN(size)) {
-        child = accumulate(child);
-      } else {
-        child = {size: size, data: child, keys: keys.slice()};
-      }
-      node.children.push(child);
-      node.size += child.size;
-      keys.pop();
-    }
-    node.children.sort(function(a, b) { return a.size - b.size; });
-    return node;
-  }
+  /** @private Adding to this layout implicitly adds to this node. */
+  this.add = function(type) { return this.parent.add(type).extend(node); };
 
-  /** @private */
-  function scale(node, k) {
-    node.size *= k;
-    if (node.children) {
-      for (var i = 0; i < node.children.length; i++) {
-        scale(node.children[i], k);
-      }
-    }
-  }
+  /* Now hide references to inherited marks. */
+  delete this.node;
+  delete this.label;
+  delete this.link;
+};
+
+pv.Layout.Treemap.prototype = pv.extend(pv.Layout.Hierarchy)
+    .property("round", Boolean)
+    .property("left", Number)
+    .property("right", Number)
+    .property("top", Number)
+    .property("bottom", Number);
+
+pv.Layout.Treemap.prototype.$size = Number;
+
+pv.Layout.Treemap.prototype.size = function(f) {
+  this.$size = f;
+  return this;
+};
+
+pv.Layout.Treemap.prototype.init = function() {
+  var that = this,
+      nodes = that.nodes(),
+      root = nodes[0],
+      stack = pv.Mark.stack,
+      left = that.left(),
+      right = that.right(),
+      top = that.top(),
+      bottom = that.bottom(),
+      round = that.round() ? Math.round : Number;
 
   /** @private */
   function ratio(row, l) {
@@ -9078,52 +9739,56 @@ pv.Layout.treemap = function(tree) {
   }
 
   /** @private */
-  function squarify(node) {
-    var row = [], mink = Infinity;
-    var x = node.left + (inset ? inset.left : 0),
-        y = node.top + (inset ? inset.top : 0),
-        w = node.width - (inset ? inset.left + inset.right : 0),
-        h = node.height - (inset ? inset.top + inset.bottom : 0),
-        l = Math.min(w, h);
+  function squarify(n) {
+    var row = [],
+        mink = Infinity,
+        x = n.x + left,
+        y = n.y + top,
+        w = n.dx - left - right,
+        h = n.dy - top - bottom,
+        l = Math.min(w, h),
+        k = w * h / n.size;
 
-    scale(node, w * h / node.size);
+    /* Scale the sizes to fill the current subregion. */
+    n.visitBefore(function(n) { n.size *= k; });
 
+    /** @private Position the specified nodes along one dimension. */
     function position(row) {
-      var s = pv.sum(row, function(node) { return node.size; }),
-          hh = (l == 0) ? 0 : rnd(s / l);
+      var s = pv.sum(row, function(n) { return n.size; }),
+          hh = (l == 0) ? 0 : round(s / l);
 
       for (var i = 0, d = 0; i < row.length; i++) {
-        var n = row[i], nw = rnd(n.size / hh);
+        var n = row[i], nw = round(n.size / hh);
         if (w == l) {
-          n.left = x + d;
-          n.top = y;
-          n.width = nw;
-          n.height = hh;
+          n.x = x + d;
+          n.y = y;
+          n.dx = nw;
+          n.dy = hh;
         } else {
-          n.left = x;
-          n.top = y + d;
-          n.width = hh;
-          n.height = nw;
+          n.x = x;
+          n.y = y + d;
+          n.dx = hh;
+          n.dy = nw;
         }
         d += nw;
       }
 
       if (w == l) {
-        if (n) n.width += w - d; // correct rounding error
+        if (n) n.dx += w - d; // correct rounding error
         y += hh;
         h -= hh;
       } else {
-        if (n) n.height += h - d; // correct rounding error
+        if (n) n.dy += h - d; // correct rounding error
         x += hh;
         w -= hh;
       }
       l = Math.min(w, h);
     }
 
-    var children = node.children.slice(); // copy
-    while (children.length > 0) {
+    var children = n.childNodes.slice(); // copy
+    while (children.length) {
       var child = children[children.length - 1];
-      if (child.size <= 0) {
+      if (!child.size) {
         children.pop();
         continue;
       }
@@ -9140,164 +9805,61 @@ pv.Layout.treemap = function(tree) {
         mink = Infinity;
       }
     }
-
-    if (row.length > 0) {
-      position(row);
-    }
+    position(row);
 
     /* correct rounding error */
-    if (w == l) {
-      for (var i = 0; i < row.length; i++) {
-        row[i].width += w;
-      }
-    } else {
-      for (var i = 0; i < row.length; i++) {
-        row[i].height += h;
-      }
+    if (w == l) for (var i = 0; i < row.length; i++) {
+      row[i].dx += w;
+    } else for (var i = 0; i < row.length; i++) {
+      row[i].dy += h;
     }
   }
 
-  /** @private */
-  function layout(node) {
-    if (node.children) {
-      squarify(node);
-      for (var i = 0; i < node.children.length; i++) {
-        var child = node.children[i];
-        child.depth = node.depth + 1;
-        layout(child);
-      }
-    }
-  }
+  /* Recursively compute the node depth and size. */
+  stack.unshift(null);
+  root.visitAfter(function(n, i) {
+      n.depth = i;
+      n.size = n.firstChild
+          ? pv.sum(n.childNodes, function(n) { return n.size; })
+          : that.$size.apply(that, (stack[0] = n.nodeValue, stack));
+    });
+  stack.shift();
 
-  /** @private */
-  function flatten(node, array) {
-    if (node.children) {
-      for (var i = 0; i < node.children.length; i++) {
-        flatten(node.children[i], array);
-      }
-    }
-    if (inset || !node.children) {
-      array.push(node)
-    }
-    return array;
-  }
-
-  /** @private */
-  function data() {
-    var root = accumulate(tree);
-    root.left = 0;
-    root.top = 0;
-    root.width = this.parent.width();
-    root.height = this.parent.height();
-    root.depth = 0;
-    layout(root);
-    return flatten(root, []).reverse();
-  }
-
-  var mark = new pv.Mark()
-      .data(data)
-      .left(function(n) { return n.left; })
-      .top(function(n) { return n.top; })
-      .width(function(n) { return n.width; })
-      .height(function(n) { return n.height; });
-
-  /**
-   * Enables or disables rounding. When rounding is enabled, the left, top,
-   * width and height properties will be rounded to integer pixel values. The
-   * rounding algorithm uses error accumulation to ensure an exact fit.
-   *
-   * @param {boolean} v whether rounding should be enabled.
-   * @function
-   * @name pv.Layout.treemap.prototype.round
-   * @returns {pv.Layout.treemap} this.
-   */
-  mark.round = function(v) {
-    round = v;
-    return this;
-  };
-
-  /**
-   * Specifies the margins to inset child nodes from their parents; as a side
-   * effect, this also enables the display of internal nodes, which are hidden
-   * by default. If only a single argument is specified, this value is used to
-   * inset all four sides.
-   *
-   * @param {number} top the top margin.
-   * @param {number} [right] the right margin.
-   * @param {number} [bottom] the bottom margin.
-   * @param {number} [left] the left margin.
-   * @function
-   * @name pv.Layout.treemap.prototype.inset
-   * @returns {pv.Layout.treemap} this.
-   */
-  mark.inset = function(top, right, bottom, left) {
-    if (arguments.length) {
-      if (arguments.length == 1) right = bottom = left = top;
-      inset = {top:top, right:right, bottom:bottom, left:left};
-      return this;
-    }
-    return inset;
-  };
-
-  /**
-   * Specifies the root key; optional. The root key is prepended to the
-   * <tt>keys</tt> attribute for all generated nodes. This method is provided
-   * for convenience and does not affect layout.
-   *
-   * @param {string} v the root key.
-   * @function
-   * @name pv.Layout.treemap.prototype.root
-   * @returns {pv.Layout.treemap} this.
-   */
-  mark.root = function(v) {
-    keys = [v];
-    return this;
-  };
-
-  /**
-   * Specifies the sizing function. By default, the sizing function is
-   * <tt>Number</tt>. The sizing function is invoked for each node in the tree
-   * (passed to the constructor): the sizing function must return
-   * <tt>undefined</tt> or <tt>NaN</tt> for internal nodes, and a number for
-   * leaf nodes. The aggregate sizes of internal nodes will be automatically
-   * computed by the layout.
-   *
-   * <p>For example, if the tree data structure represents a file system, with
-   * files as leaf nodes, and each file has a <tt>bytes</tt> attribute, you can
-   * specify a size function as:
-   *
-   * <pre>.size(function(d) d.bytes)</pre>
-   *
-   * This function will return <tt>undefined</tt> for internal nodes (since
-   * these do not have a <tt>bytes</tt> attribute), and a number for leaf nodes.
-   *
-   * <p>Note that the built-in <tt>Math.sqrt</tt> and <tt>Math.log</tt> methods
-   * can be used as sizing functions. These function similarly to
-   * <tt>Number</tt>, except perform a root and log scale, respectively.
-   *
-   * @param {function} f the new sizing function.
-   * @function
-   * @name pv.Layout.treemap.prototype.size
-   * @returns {pv.Layout.treemap} this.
-   */
-  mark.size = function(f) {
-    sizeof = f;
-    return this;
-  };
-
-  return mark;
+  /* Sort by ascending size, then recursively compute the layout. */
+  root.sort(function(a, b) { return a.size - b.size; });
+  root.x = 0;
+  root.y = 0;
+  root.dx = that.parent.width();
+  root.dy = that.parent.height();
+  root.visitBefore(squarify);
 };
 /** @see http://citeseer.ist.psu.edu/buchheim02improving.html */
-pv.Layout.tree = function(map) {
-  var nodes, // cached pv.dom(map).nodes()
-      sort, // optional sort function
-      orient = "top", // default orientation
-      offset = {depth:60, breadth:15}, // default offsets
-      g = 1, // default amount to group siblings
-      w, // cached parent panel width
-      h; // cached parent panel height
+pv.Layout.Tree = function() {
+  pv.Layout.Hierarchy.call(this);
+};
 
-  // TODO support expanded / non-expanded nodes
+pv.Layout.Tree.prototype = pv.extend(pv.Layout.Hierarchy)
+    .property("group", Number)
+    .property("breadth", Number)
+    .property("depth", Number)
+    .property("orient", String);
+
+pv.Layout.Tree.prototype.defaults = new pv.Layout.Tree()
+    .extend(pv.Layout.Hierarchy.prototype.defaults)
+    .group(1)
+    .breadth(15)
+    .depth(60)
+    .orient("top");
+
+pv.Layout.Tree.prototype.init = function() {
+  if (pv.Layout.Hierarchy.prototype.init.call(this)) return;
+  var nodes = this.nodes(),
+      orient = this.orient(),
+      depth = this.depth(),
+      breadth = this.breadth(),
+      group = this.group(),
+      w = this.parent.width(),
+      h = this.parent.height();
 
   /** @private */
   function firstWalk(v) {
@@ -9418,313 +9980,215 @@ pv.Layout.tree = function(map) {
 
   /** @private */
   function distance(depth, siblings) {
-    return (siblings ? 1 : (g + 1)) / ((orient == "radial") ? depth : 1);
+    return (siblings ? 1 : (group + 1)) / ((orient == "radial") ? depth : 1);
   }
 
-  /** @private */
-  function data() {
-    /* Cache the parent panel dimensions to avoid repeated lookup. */
-    w = this.parent.width();
-    h = this.parent.height();
+  /* Initialize temporary layout variables. TODO: store separately. */
+  var root = nodes[0];
+  root.visitAfter(function(v, i) {
+      v.ancestor = v;
+      v.prelim = 0;
+      v.mod = 0;
+      v.change = 0;
+      v.shift = 0;
+      v.number = v.previousSibling ? (v.previousSibling.number + 1) : 0;
+      v.depth = i;
+    });
 
-    /* If the layout was previously computed, use that. */
-    if (nodes) return nodes;
-    nodes = pv.dom(map).nodes();
-
-    /* Sort the tree and initialize temporary layout variables. */
-    var root = nodes[0];
-    if (sort) root.sort(sort);
-    root.visitAfter(function(v, i) {
-        v.ancestor = v;
-        v.prelim = 0;
-        v.mod = 0;
-        v.change = 0;
-        v.shift = 0;
-        v.number = v.previousSibling ? (v.previousSibling.number + 1) : 0;
-        v.depth = i;
-      });
-
-    /* Compute the layout using Buchheim et al.'s algorithm. */
-    firstWalk(root);
-    secondWalk(root, -root.prelim, 0);
-
-    /* Clear temporary layout variables; scale depth and breadth. */
-    root.visitAfter(function(v) {
-        v.breadth *= offset.breadth;
-        v.depth *= offset.depth;
-        delete v.ancestor;
-        delete v.prelim;
-        delete v.mod;
-        delete v.change;
-        delete v.shift;
-        delete v.number;
-      });
-
-    return nodes;
-  }
-
-  /** @private The layout, on which all public methods are registered. */
-  var layout = {};
-
-  /**
-   * Sets or gets the orientation. The default orientation is "left", which
-   * means that the root node is placed on the left edge, leaf nodes appear on
-   * the right edge, and internal nodes are in-between. The following
-   * orientations are supported:<ul>
-   *
-   * <li>left - left-to-right.
-   * <li>right - right-to-left.
-   * <li>top - top-to-bottom.
-   * <li>bottom - bottom-to-top.
-   * <li>radial - radially, with the root at the center.</ul>
-   *
-   * @param {string} v the new orientation.
-   * @function
-   * @name pv.Layout.tree.prototype.orient
-   * @returns {pv.Layout.tree} this, or the current orientation.
-   */
-  layout.orient = function(v) {
-    if (arguments.length) {
-      orient = v;
-      return this;
-    }
-    return orient;
-  };
-
-  /**
-   * Sets or gets the sort function. The sort function is applied to the tree
-   * before the layout is computed; it is a comparator function which takes two
-   * arguments and returns a negative number, a positive number, or zero as
-   * appropriate. For example, to sort on the node names:
-   *
-   * <pre>  .sort(function(a, b) pv.naturalOrder(a.nodeName, b.nodeName))</pre>
-   *
-   * @param {function} f the new sort function.
-   * @function
-   * @name pv.Layout.cluster.prototype.sort
-   * @returns {pv.Layout.cluster} this, or the current sort function.
-   * @see pv.naturalOrder
-   * @see pv.Dom.Node.prototype.sort
-   */
-  layout.sort = function(f) {
-    if (arguments.length) {
-      sort = f;
-      return this;
-    }
-    return sort;
-  };
-
-  /**
-   * Specifies the amount to offset child nodes from their parents and
-   * siblings. If only a single argument is specified, this value is used to
-   * offset both depth (parent) and breadth (siblings).
-   *
-   * @param {number} depth the depth offset.
-   * @param {number} [breadth] the breadth offset.
-   * @function
-   * @name pv.Layout.tree.prototype.offset
-   * @returns {pv.Layout.tree} this, or the current offsets.
-   */
-  layout.offset = function(depth, breadth) {
-    if (arguments.length) {
-      if (arguments.length == 1) breadth = depth;
-      offset = {breadth: breadth, depth: depth};
-      return this;
-    }
-    return offset;
-  };
-
-  /**
-   * Sets or gets whether siblings are grouped, i.e., whether differentiating
-   * space is placed between sibling groups. The default is 1 (or true), causing
-   * sibling leaves to be separated by one breadth offset. Setting this to false
-   * (or 0) causes non-siblings to be adjacent.
-   *
-   * @param {number} x the new group spacing.
-   * @function
-   * @name pv.Layout.tree.prototype.groupSiblings
-   * @returns {pv.Layout.tree} this, or the current group spacing.
-   */
-  layout.groupSiblings = function(x) {
-    if (arguments.length) {
-      g = Number(x);
-      return this;
-    }
-    return g;
-  };
-
-  /**
-   * Returns the nodes associated with this layout.
-   *
-   * @function
-   * @name pv.Layout.tree.prototype.nodes
-   * @returns {array}
-   */
-  layout.nodes = data;
-
-  /**
-   * Returns the links associated with this layout. Each link is represented as
-   * a two-element array; the first element is the child node, and the second
-   * element is the parent node.
-   *
-   * @function
-   * @name pv.Layout.tree.prototype.links
-   * @returns {array}
-   */
-  layout.links = function() {
-    return data.call(this)
-        .filter(function(n) { return n.parentNode; })
-        .map(function(n) { return [n, n.parentNode]; });
-  };
+  /* Compute the layout using Buchheim et al.'s algorithm. */
+  firstWalk(root);
+  secondWalk(root, -root.prelim, 0);
 
   /** @private Returns the angle of the given node. */
   function angle(n) {
-    return n.breadth / offset.depth;
+    return (orient == "radial")
+        ? n.breadth / depth
+        : (n.firstChild ? Math.PI : 0);
   }
 
-  /**
-   * The node prototype. This prototype is intended to be used with a Dot mark
-   * in conjunction with the link prototype.
-   *
-   * @type pv.Mark
-   * @name pv.Layout.tree.prototype.node
-   */
-  layout.node = new pv.Mark()
-      .data(data)
-      .strokeStyle("#1f77b4")
-      .fillStyle("#fff")
-      .left(function(n) {
-          switch (orient) {
-            case "left": return n.depth;
-            case "right": return w - n.depth;
-            case "top":
-            case "bottom": return n.breadth + w / 2;
-            case "radial": return w / 2 + n.depth * Math.cos(angle(n));
-          }
-        })
-      .top(function(n) {
-          switch (orient) {
-            case "left":
-            case "right": return n.breadth + h / 2;
-            case "top": return n.depth;
-            case "bottom": return h - n.depth;
-            case "radial": return h / 2 + n.depth * Math.sin(angle(n));
-          }
-        });
+  /** @private */
+  function x(n) {
+    switch (orient) {
+      case "left": return n.depth;
+      case "right": return w - n.depth;
+      case "top":
+      case "bottom": return n.breadth + w / 2;
+      case "radial": return w / 2 + n.depth * Math.cos(angle(n));
+    }
+  }
 
-  /**
-   * The link prototype, which renders edges between child nodes and their
-   * parents. This prototype is intended to be used with a Line mark in
-   * conjunction with the node prototype.
-   *
-   * @type pv.Mark
-   * @name pv.Layout.tree.prototype.link
-   */
-  layout.link = new pv.Mark().extend(layout.node)
-      .data(pv.identity)
-      .fillStyle(null)
-      .strokeStyle("#ccc");
+  /** @private */
+  function y(n) {
+    switch (orient) {
+      case "left":
+      case "right": return n.breadth + h / 2;
+      case "top": return n.depth;
+      case "bottom": return h - n.depth;
+      case "radial": return h / 2 + n.depth * Math.sin(angle(n));
+    }
+  }
 
-  /**
-   * The node label prototype, which renders the node name adjacent to the node.
-   * This prototype is provided as an alternative to using the anchor on the
-   * node mark; it is primarily intended to be used with radial layouts, since
-   * it provides a convenient mechanism to set the text angle.
-   *
-   * @type pv.Mark
-   * @name pv.Layout.tree.prototype.label
-   */
-  layout.label = new pv.Mark()
-      .extend(layout.node)
-      .textMargin(7)
-      .textBaseline("middle")
-      .text(function(n) { return n.parentNode ? n.nodeName : "root"; })
-      .textAngle(function(n) {
-          if (orient != "radial") return 0;
-          var a = angle(n);
-          return pv.Wedge.upright(a) ? a : (a + Math.PI);
-        })
-      .textAlign(function(n) {
-          if (orient != "radial") return n.firstChild ? "right" : "left";
-          return pv.Wedge.upright(angle(n)) ? "left" : "right";
-        });
-
-  return layout;
+  /* Clear temporary layout variables; transform depth and breadth. */
+  root.visitAfter(function(v) {
+      v.breadth *= breadth;
+      v.depth *= depth;
+      v.angle = angle(v);
+      v.x = x(v);
+      v.y = y(v);
+      delete v.breadth;
+      delete v.depth;
+      delete v.ancestor;
+      delete v.prelim;
+      delete v.mod;
+      delete v.change;
+      delete v.shift;
+      delete v.number;
+      delete v.thread;
+    });
 };
-pv.Layout.indent = function(map) {
-  var nodes,
-      bspace = 15,
-      dspace = 15,
-      ax,
-      ay;
+
+/**
+ * The orientation. The default orientation is "left", which means that the root
+ * node is placed on the left edge, leaf nodes appear on the right edge, and
+ * internal nodes are in-between. The following orientations are supported:<ul>
+ *
+ * <li>left - left-to-right.
+ * <li>right - right-to-left.
+ * <li>top - top-to-bottom.
+ * <li>bottom - bottom-to-top.
+ * <li>radial - radially, with the root at the center.</ul>
+ *
+ * @param {string} v the new orientation.
+ * @function
+ * @name pv.Layout.Tree.prototype.orient
+ * @returns {pv.Layout.Tree} this, or the current orientation.
+ */
+
+/**
+ * The sibling grouping, i.e., whether differentiating space is placed between
+ * sibling groups. The default is 1 (or true), causing sibling leaves to be
+ * separated by one breadth offset. Setting this to false (or 0) causes
+ * non-siblings to be adjacent.
+ *
+ * @param {number} x the new group spacing.
+ * @function
+ * @name pv.Layout.Tree.prototype.group
+ * @returns {pv.Layout.Tree} this, or the current group spacing.
+ */
+pv.Layout.Indent = function() {
+  pv.Layout.Hierarchy.call(this);
+  this.link.interpolate("step-after");
+};
+
+pv.Layout.Indent.prototype = pv.extend(pv.Layout.Hierarchy)
+    .property("depth", Number)
+    .property("breadth", Number);
+
+pv.Layout.Indent.prototype.defaults = new pv.Layout.Indent()
+    .extend(pv.Layout.Hierarchy.prototype.defaults)
+    .depth(15)
+    .breadth(15);
+
+pv.Layout.Indent.prototype.init = function() {
+  if (pv.Layout.Hierarchy.prototype.init.call(this)) return;
+  var nodes = this.nodes(),
+      bspace = this.breadth(),
+      dspace = this.depth(),
+      ax = 0,
+      ay = 0;
 
   /** @private */
   function position(n, breadth, depth) {
     n.x = ax + depth++ * dspace;
     n.y = ay + breadth++ * bspace;
+    n.angle = 0;
     for (var c = n.firstChild; c; c = c.nextSibling) {
       breadth = position(c, breadth, depth);
     }
     return breadth;
   }
 
-  /** @private */
-  function data() {
-    if (nodes) return nodes;
-    nodes = pv.dom(map).nodes();
-    ax = dspace;
-    ay = bspace;
-    position(nodes[0], 0, 0);
-    return nodes;
-  }
-
-  var layout = {};
-
-  layout.nodes = data;
-
-  layout.links = function() {
-    return data.call(this)
-        .filter(function(n) { return n.parentNode; })
-        .map(function(n) { return [n, n.parentNode]; });
-  };
-
-  layout.spacing = function(depth, breadth) {
-    dspace = depth;
-    bspace = breadth;
-    return this;
-  };
-
-  layout.node = new pv.Mark()
-      .data(data)
-      .strokeStyle("#1f77b4")
-      .fillStyle("#fff")
-      .left(function(n) { return n.x; })
-      .top(function(n) { return n.y; });
-
-  layout.link = new pv.Mark().extend(layout.node)
-      .data(pv.identity)
-      .antialias(false)
-      .interpolate("step-after")
-      .strokeStyle("#ccc")
-      .fillStyle(null);
-
-  return layout;
+  position(nodes[0], 1, 1);
 };
-pv.Layout.pack = function(map) {
-  var nodes, spacing = 1, radius = function() { return 1; };
+pv.Layout.Pack = function() {
+  pv.Layout.Hierarchy.call(this);
 
-  // TODO is it possible for spacing to operate in pixel space?
-  // Right now it appears to be multiples of the smallest radius.
+  var node = this.node
+      .radius(function(n) { return n.radius; })
+      .strokeStyle("rgb(31, 119, 180)")
+      .fillStyle("rgba(31, 119, 180, .25)");
+
+  /** @private Adding to this layout implicitly adds to this node. */
+  this.add = function(type) { return this.parent.add(type).extend(node); };
+
+  /* Now hide references to inherited marks. */
+  delete this.node;
+  delete this.label;
+  delete this.link;
+};
+
+pv.Layout.Pack.prototype = pv.extend(pv.Layout.Hierarchy)
+    .property("spacing", Number);
+
+pv.Layout.Pack.prototype.defaults = new pv.Layout.Pack()
+    .extend(pv.Layout.Hierarchy.prototype.defaults)
+    .spacing(1);
+
+/** @private The default size function. */
+pv.Layout.Pack.prototype.$radius = function() { return 1; };
+
+// TODO is it possible for spacing to operate in pixel space?
+// Right now it appears to be multiples of the smallest radius.
+
+/**
+ * Specifies the sizing function. By default, a sizing function is disabled and
+ * all nodes are given constant size. The sizing function is invoked for each
+ * leaf node in the tree (passed to the constructor).
+ *
+ * <p>For example, if the tree data structure represents a file system, with
+ * files as leaf nodes, and each file has a <tt>bytes</tt> attribute, you can
+ * specify a size function as:
+ *
+ * <pre>.size(function(d) d.bytes)</pre>
+ *
+ * @param {function} f the new sizing function.
+ * @returns {pv.Layout.Pack} this.
+ */
+pv.Layout.Pack.prototype.size = function(f) {
+  this.$radius = typeof f == "function"
+      ? function() { return Math.sqrt(f.apply(this, arguments)); }
+      : (f = Math.sqrt(f), function() { return f; });
+  return this;
+};
+
+/** @private */
+pv.Layout.Pack.prototype.init = function() {
+  if (pv.Layout.Hierarchy.prototype.init.call(this)) return;
+  var that = this, spacing;
+
+  /** @private Compute the radii of the leaf nodes. */
+  function radii(nodes) {
+    var stack = pv.Mark.stack;
+    stack.unshift(null);
+    for (var i = 0, n = nodes.length; i < n; i++) {
+      var c = nodes[i];
+      if (!c.firstChild) {
+        stack[0] = c.nodeValue;
+        c.radius = that.$radius.apply(that, stack);
+      }
+    }
+    stack.shift();
+  }
 
   /** @private */
   function packTree(n) {
     var nodes = [];
     for (var c = n.firstChild; c; c = c.nextSibling) {
-      c.r = c.firstChild ? packTree(c) : radius(c.nodeValue);
+      if (c.firstChild) c.radius = packTree(c);
       c.n = c.p = c;
       nodes.push(c);
     }
-    nodes.sort(function(a, b) { return a.r - b.r; });
+    nodes.sort(function(a, b) { return a.radius - b.radius; });
     return packCircle(nodes);
   }
 
@@ -9738,10 +10202,10 @@ pv.Layout.pack = function(map) {
 
     /** @private */
     function bound(n) {
-      xMin = Math.min(n.x - n.r, xMin);
-      xMax = Math.max(n.x + n.r, xMax);
-      yMin = Math.min(n.y - n.r, yMin);
-      yMax = Math.max(n.y + n.r, yMax);
+      xMin = Math.min(n.x - n.radius, xMin);
+      xMax = Math.max(n.x + n.radius, xMax);
+      yMin = Math.min(n.y - n.radius, yMin);
+      yMax = Math.max(n.y + n.radius, yMax);
     }
 
     /** @private */
@@ -9763,20 +10227,20 @@ pv.Layout.pack = function(map) {
     function intersects(a, b) {
       var dx = b.x - a.x,
           dy = b.y - a.y,
-          dr = a.r + b.r;
+          dr = a.radius + b.radius;
       return (dr * dr - dx * dx - dy * dy) > .001; // within epsilon
     }
 
     /* Create first node. */
     a = nodes[0];
-    a.x = -a.r;
+    a.x = -a.radius;
     a.y = 0;
     bound(a);
 
     /* Create second node. */
     if (nodes.length > 1) {
       b = nodes[1];
-      b.x = b.r;
+      b.x = b.radius;
       b.y = 0;
       bound(b);
 
@@ -9840,15 +10304,15 @@ pv.Layout.pack = function(map) {
       var n = nodes[i];
       n.x -= cx;
       n.y -= cy;
-      cr = Math.max(cr, n.r + Math.sqrt(n.x * n.x + n.y * n.y));
+      cr = Math.max(cr, n.radius + Math.sqrt(n.x * n.x + n.y * n.y));
     }
     return cr + spacing;
   }
 
   /** @private */
   function place(a, b, c) {
-    var da = b.r + c.r,
-        db = a.r + c.r,
+    var da = b.radius + c.radius,
+        db = a.radius + c.radius,
         dx = b.x - a.x,
         dy = b.y - a.y,
         dc = Math.sqrt(dx * dx + dy * dy),
@@ -9871,130 +10335,120 @@ pv.Layout.pack = function(map) {
     }
     n.x = x + k * n.x;
     n.y = y + k * n.y;
-    n.r *= k;
+    n.radius *= k;
   }
 
-  /** @private */
-  function data() {
-    if (nodes) return nodes;
-    nodes = pv.dom(map).nodes();
+  var nodes = this.nodes();
+  spacing = this.spacing();
+  radii(nodes);
 
-    var root = nodes[0];
-    root.x = 0;
-    root.y = 0;
-    root.r = packTree(root);
+  var root = nodes[0];
+  root.x = 0;
+  root.y = 0;
+  root.radius = packTree(root);
 
-    var w = this.parent.width(),
-        h = this.parent.height(),
-        k = 1 / Math.max(2 * root.r / w, 2 * root.r / h);
-    transform(root, w / 2, h / 2, k);
+  var w = this.parent.width(),
+      h = this.parent.height(),
+      k = 1 / Math.max(2 * root.radius / w, 2 * root.radius / h);
+  transform(root, w / 2, h / 2, k);
+};
+pv.Layout.Force = function() {
+  pv.Layout.Network.call(this);
 
-    return nodes;
+  /* Force-directed graphs can be messy, so reduce the link width. */
+  this.link.lineWidth(function(d, p) { return Math.sqrt(p.linkValue) * 1.5; });
+};
+
+pv.Layout.Force.prototype = pv.extend(pv.Layout.Network)
+    .property("bound", Boolean)
+    .property("iterations", Number);
+
+/** @private Initialize the physics simulation. */
+pv.Layout.Force.prototype.init = function() {
+  if (pv.Layout.Network.prototype.init.call(this)) return;
+  var nodes = this.nodes(), links = this.links();
+
+  /* Initialize positions using a random walk from the center. */
+  var w = this.parent.width(),
+      h = this.parent.height(),
+      x = w / 2,
+      y = h / 2;
+  for (var i = 0; i < nodes.length; i++) {
+    var n = nodes[i], angle = Math.random() * 2 * Math.PI;
+    n.x = x += 10 * (w / h) * Math.cos(angle);
+    n.y = y += 10 * (h / w) * Math.sin(angle);
   }
 
-  var mark = new pv.Mark()
-      .data(data)
-      .size(function(n) { return n.r * n.r; })
-      .left(function(n) { return n.x; })
-      .top(function(n) { return n.y; })
-      .strokeStyle("rgb(31, 119, 180)")
-      .fillStyle("rgba(31, 119, 180, .25)");
+  /* Initialize the simulation. */
+  var sim = pv.simulation(nodes);
+  sim.force(pv.Force.drag());
+  sim.force(pv.Force.charge());
+  sim.force(pv.Force.spring().links(links));
 
-  /**
-   * Specifies the sizing function. By default, a sizing function is disabled
-   * and all nodes are given constant size. The sizing function is invoked for
-   * each leaf node in the tree (passed to the constructor).
-   *
-   * <p>For example, if the tree data structure represents a file system, with
-   * files as leaf nodes, and each file has a <tt>bytes</tt> attribute, you can
-   * specify a size function as:
-   *
-   * <pre>.size(function(d) d.bytes)</pre>
-   *
-   * @param {function} f the new sizing function.
-   * @function
-   * @name pv.Layout.sunburst.prototype.size
-   * @returns {pv.Layout.sunburst} this.
+  /* Optionally add bound constraint. TODO: better padding. */
+  if (this.bound()) {
+    sim.constraint(pv.Constraint.bound().x(6, w - 6).y(6, h - 6));
+  }
+
+  /*
+   * If the iterations property is null (the default), the layout is
+   * interactive. The simulation is run until the fastest particle drops below
+   * an arbitrary minimum speed. Although the timer keeps firing, this speed
+   * calculation is fast so there is minimal CPU overhead. Note: if a particle
+   * is fixed for interactivity, treat this as a high speed and resume
+   * simulation.
    */
-  mark.size = function(f) {
-    radius = function(x) { return Math.sqrt(f(x)); };
-    return this;
+  var n = this.iterations();
+  if (n == null) {
+    function speed(n) { return n.fixed ? 1 : n.vx * n.vx + n.vy * n.vy; }
+    sim.step(); // compute initial velocities
+    var v = 1, min = 1e-4 * (links.length + 1), parent = this.parent;
+    setInterval(function() {
+        if (v > min) {
+          var then = Date.now();
+          do { sim.step(); } while (Date.now() - then < 20);
+          parent.render();
+        }
+        v = pv.max(nodes, speed);
+      }, 42);
+  } else for (var i = 0; i < n; i++) {
+    sim.step();
+  }
+}
+pv.Layout.Cluster = function() {
+  pv.Layout.Hierarchy.call(this);
+  var interpolate, init = this.init;
+
+  /** @private Cache layout state to optimize properties. */
+  this.init = function() {
+    var orient = this.orient();
+    interpolate
+        = /^(top|bottom)$/.test(orient) ? "step-before"
+        : /^(left|right)$/.test(orient) ? "step-after"
+        : "linear";
+    init.call(this);
   };
 
-  mark.nodes = data;
-
-  return mark;
-};
-pv.Layout.force = function(nodes, links) {
-  var layout = {
-          charge: pv.Force.charge(),
-          drag: pv.Force.drag(),
-          spring: pv.Force.spring()
-        },
-      sim;
-
-  /** @private */
-  function data() {
-    if (!sim) {
-      /* Initialize position using a random walk from the center. */
-      var x = this.parent.width() / 2,
-          y = this.parent.height() / 2;
-      for (var i = 0, n, a; i < nodes.length; i++) {
-        n = nodes[i];
-        a = Math.random() * 2 * Math.PI;
-        n.x = x += 4 * Math.cos(a);
-        n.y = y += 4 * Math.sin(a);
-      }
-
-      sim = pv.simulation(nodes);
-      sim.force(layout.charge);
-      sim.force(layout.drag);
-      sim.force(layout.spring.links(links));
-      sim.step();
-    }
-    return nodes;
-  }
-
-  layout.nodes = nodes = nodes.map(function(d, i) {
-      return {nodeName: i, nodeValue: d, linkDegree: 0};
-    });
-
-  layout.links = links = links.map(function(d) {
-      var s = nodes[d.source],
-          t = nodes[d.target],
-          v = isNaN(d.value) ? 1 : d.value;
-      s.linkDegree += v;
-      t.linkDegree += v;
-      return {sourceNode: s, targetNode: t, linkValue: v};
-    });
-
-  layout.node = new pv.Mark()
-      .data(data)
-      .strokeStyle("#1f77b4")
-      .fillStyle("#fff")
-      .left(function(n) { return n.x; })
-      .top(function(n) { return n.y; });
-
-  layout.link = new pv.Mark().extend(layout.node)
-      .data(function(p) { return [p.sourceNode, p.targetNode]; })
-      .fillStyle(null)
-      .lineWidth(function(d, p) { return Math.sqrt(p.linkValue) * 1.5; })
-      .strokeStyle("rgba(0,0,0,.2)");
-
-  layout.step = function() { sim.step(); };
-
-  return layout;
+  this.link.interpolate(function() { return interpolate; });
 };
 
-pv.Layout.cluster = function(map) {
-  var nodes, // cached pv.dom(map).nodes()
-      sort, // optional sort function
-      orient = "top", // default orientation
-      g = 0, // amount to group leaves
-      w, // cached parent panel width
-      h, // cached parent panel height
-      r, // cached Math.min(w, h) / 2
-      ds; // cached depth step (inverse depth of tree)
+pv.Layout.Cluster.prototype = pv.extend(pv.Layout.Hierarchy)
+    .property("group", Number)
+    .property("orient", String);
+
+pv.Layout.Cluster.prototype.defaults = new pv.Layout.Cluster()
+    .extend(pv.Layout.Hierarchy.prototype.defaults)
+    .group(0)
+    .orient("top");
+
+pv.Layout.Cluster.prototype.init = function() {
+  if (pv.Layout.Hierarchy.prototype.init.call(this)) return;
+  var nodes = this.nodes(),
+      orient = this.orient(),
+      g = this.group(),
+      w = this.parent.width(),
+      h = this.parent.height(),
+      r = Math.min(w, h) / 2;
 
   /** @private Compute the maximum depth of descendants for each node. */
   function depth(n) {
@@ -10005,155 +10459,49 @@ pv.Layout.cluster = function(map) {
     return n.depth = d;
   }
 
-  /** @private Cache the parent panel dimensions to avoid repeated lookup. */
-  function init() {
-    w = this.parent.width();
-    h = this.parent.height();
-    r = Math.min(w, h) / 2;
-  }
+  /* Compute the initial depth of each node. */
+  var root = nodes[0], ds = 1 / depth(root);
 
-  /** @private The layout, on which all public methods are registered. */
-  function layout() {
-    /* If the layout was previously computed, use that. */
-    if (nodes) return nodes;
-    nodes = pv.dom(map).nodes();
-
-    /* Sort the tree and compute the initial depth of each node. */
-    var root = nodes[0];
-    if (sort) root.sort(sort);
-    ds = 1 / depth(root);
-
-    /* Count the number of leaf nodes. */
-    var leafCount = 0, p;
-    root.visitAfter(function(n) {
-        if (!n.firstChild) {
-          if (g && (p != n.parentNode)) {
-            p = n.parentNode;
-            leafCount += g;
-          }
-          leafCount++;
+  /* Count the number of leaf nodes. */
+  var leafCount = 0, p;
+  root.visitAfter(function(n) {
+      if (!n.firstChild) {
+        if (g && (p != n.parentNode)) {
+          p = n.parentNode;
+          leafCount += g;
         }
-      });
+        leafCount++;
+      }
+    });
 
-    /* Compute the unit breadth and depth of each node. */
-    var leafIndex = .5 - g / 2, step = 1 / leafCount, p = undefined;
-    root.visitAfter(function(n) {
-        if (n.firstChild) {
-          var b = 0;
-          for (var c = n.firstChild; c; c = c.nextSibling) b += c.breadth;
-          b /= n.childNodes.length;
-        } else {
-          if (g && (p != n.parentNode)) {
-            p = n.parentNode;
-            leafIndex += g;
-          }
-          b = step * leafIndex++;
+  /* Compute the unit breadth and depth of each node. */
+  var leafIndex = .5 - g / 2, step = 1 / leafCount, p = undefined;
+  root.visitAfter(function(n) {
+      if (n.firstChild) {
+        var b = 0;
+        for (var c = n.firstChild; c; c = c.nextSibling) b += c.breadth;
+        b /= n.childNodes.length;
+      } else {
+        if (g && (p != n.parentNode)) {
+          p = n.parentNode;
+          leafIndex += g;
         }
-        n.breadth = b;
-        n.depth = 1 - n.depth / root.depth;
-      });
+        b = step * leafIndex++;
+      }
+      n.breadth = b;
+      n.depth = 1 - n.depth / root.depth;
+    });
 
-    /* Compute breadth and depth ranges for space-filling layouts. */
-    root.visitAfter(function(n) {
-        n.minBreadth = n.firstChild ? n.firstChild.minBreadth : (n.breadth - step / 2);
-        n.maxBreadth = n.firstChild ? n.lastChild.maxBreadth : (n.breadth + step / 2);
-      });
-    root.visitBefore(function(n) {
-        n.minDepth = n.parentNode ? n.parentNode.maxDepth : 0;
-        n.maxDepth = n.parentNode ? (n.depth + root.depth) : (n.minDepth + 2 * root.depth);
-      });
-    root.minDepth = -ds;
-    return nodes;
-  }
-
-  /**
-   * Sets or gets the orientation. The default orientation is "left", which
-   * means that the root node is placed on the left edge, leaf nodes appear on
-   * the right edge, and internal nodes are in-between. The following
-   * orientations are supported:<ul>
-   *
-   * <li>left - left-to-right.
-   * <li>right - right-to-left.
-   * <li>top - top-to-bottom.
-   * <li>bottom - bottom-to-top.
-   * <li>radial - radially, with the root at the center.</ul>
-   *
-   * @param {string} v the new orientation.
-   * @function
-   * @name pv.Layout.cluster.prototype.orient
-   * @returns {pv.Layout.cluster} this, or the current orientation.
-   */
-  layout.orient = function(v) {
-    if (arguments.length) {
-      orient = String(v);
-      return this;
-    }
-    return orient;
-  };
-
-  /**
-   * Sets or gets the sort function. The sort function is applied to the tree
-   * before the layout is computed; it is a comparator function which takes two
-   * arguments and returns a negative number, a positive number, or zero as
-   * appropriate. For example, to sort on the node names:
-   *
-   * <pre>  .sort(function(a, b) pv.naturalOrder(a.nodeName, b.nodeName))</pre>
-   *
-   * @param {function} f the new sort function.
-   * @function
-   * @name pv.Layout.cluster.prototype.sort
-   * @returns {pv.Layout.cluster} this, or the current sort function.
-   * @see pv.naturalOrder
-   * @see pv.Dom.Node.prototype.sort
-   */
-  layout.sort = function(f) {
-    if (arguments.length) {
-      sort = f;
-      return this;
-    }
-    return sort;
-  };
-
-  /**
-   * Sets or gets whether leaves of a given parent are grouped, i.e., whether
-   * differentiating space is placed between sibling leaf groups. The default is
-   * 0 (or false), causing non-sibling leaves to be adjacent. Setting this to
-   * true (or 1) uses one leaf's worth of spacing between groups.
-   *
-   * @param {number} x the new group spacing.
-   * @function
-   * @name pv.Layout.cluster.prototype.groupLeaves
-   * @returns {pv.Layout.cluster} this, or the current group spacing.
-   */
-  layout.groupLeaves = function(x) {
-    if (arguments.length) {
-      g = Number(x);
-      return this;
-    }
-    return g;
-  };
-
-  /**
-   * Returns the nodes associated with this layout.
-   *
-   * @function
-   * @name pv.Layout.cluster.prototype.nodes
-   * @returns {array}
-   */
-  layout.nodes = layout;
-
-  /**
-   * Returns the links associated with this layout. Each link is represented as
-   * a two-element array; the first element is the child node, and the second
-   * element is the parent node.
-   *
-   * @function
-   * @name pv.Layout.cluster.prototype.links
-   * @returns {array}
-   */
-  layout.links = function() {
-    return layout().slice(1).map(function(n) { return [n, n.parentNode]; });
-  };
+  /* Compute breadth and depth ranges for space-filling layouts. */
+  root.visitAfter(function(n) {
+      n.minBreadth = n.firstChild ? n.firstChild.minBreadth : (n.breadth - step / 2);
+      n.maxBreadth = n.firstChild ? n.lastChild.maxBreadth : (n.breadth + step / 2);
+    });
+  root.visitBefore(function(n) {
+      n.minDepth = n.parentNode ? n.parentNode.maxDepth : 0;
+      n.maxDepth = n.parentNode ? (n.depth + root.depth) : (n.minDepth + 2 * root.depth);
+    });
+  root.minDepth = -ds;
 
   /** @private Returns the radius of the given node. */
   function radius(n) {
@@ -10162,662 +10510,445 @@ pv.Layout.cluster = function(map) {
 
   /** @private Returns the angle of the given node. */
   function angle(n) {
-    return n.parentNode ? (n.breadth - .25) * 2 * Math.PI : 0;
+    return (orient == "radial")
+        ? (n.parentNode ? (n.breadth - .25) * 2 * Math.PI : 0)
+        : (n.firstChild ? Math.PI : 0);
   }
-
-  /** @private Scales the specified depth for a space-filling layout. */
-  function scale(d, ds) {
-    return (d + ds) / (1 + ds);
-  }
-
-  /**
-   * The node prototype. This prototype is intended to be used with a Dot mark
-   * in conjunction with the link prototype.
-   *
-   * @type pv.Mark
-   * @name pv.Layout.cluster.prototype.node
-   */
-  layout.node = new pv.Mark()
-      .def("init", init)
-      .data(layout)
-      .strokeStyle("#1f77b4")
-      .fillStyle("white")
-      .left(function(n) {
-          switch (orient) {
-            case "left": return n.depth * w;
-            case "right": return w - n.depth * w;
-            case "top": return n.breadth * w;
-            case "bottom": return w - n.breadth * w;
-            case "radial": return w / 2 + radius(n) * Math.cos(angle(n));
-          }
-        })
-      .top(function(n) {
-          switch (orient) {
-            case "left": return n.breadth * h;
-            case "right": return h - n.breadth * h;
-            case "top": return n.depth * h;
-            case "bottom": return h - n.depth * h;
-            case "radial": return h / 2 + radius(n) * Math.sin(angle(n));
-          }
-        });
-
-  /**
-   * The link prototype, which renders edges between child nodes and their
-   * parents. This prototype is intended to be used with a Line mark in
-   * conjunction with the node prototype.
-   *
-   * @type pv.Mark
-   * @name pv.Layout.cluster.prototype.link
-   */
-  layout.link = new pv.Mark()
-      .extend(layout.node)
-      .data(pv.identity)
-      .antialias(function() { return orient == "radial"; })
-      .interpolate(function() {
-          switch (orient) {
-            case "top":
-            case "bottom": return "step-before";
-            case "left":
-            case "right": return "step-after";
-          }
-        })
-      .strokeStyle("#ccc")
-      .fillStyle(null);
-
-  /**
-   * The node label prototype, which renders the node name adjacent to the node.
-   * This prototype is provided as an alternative to using the anchor on the
-   * node or fill mark; it is primarily intended to be used with radial
-   * node-link layouts, since it provides a convenient mechanism to set the text
-   * angle.
-   *
-   * @type pv.Mark
-   * @name pv.Layout.cluster.prototype.label
-   */
-  layout.label = new pv.Mark()
-      .extend(layout.node)
-      .textMargin(7)
-      .textBaseline("middle")
-      .text(function(n) { return n.parentNode ? n.nodeName : "root"; })
-      .textAngle(function(n) {
-          if (orient != "radial") return 0;
-          var a = angle(n);
-          return pv.Wedge.upright(a) ? a : (a + Math.PI);
-        })
-      .textAlign(function(n) {
-          if (orient != "radial") return n.firstChild ? "right" : "left";
-          return pv.Wedge.upright(angle(n)) ? "left" : "right";
-        });
-
-  /**
-   * The fill prototype, used for a space-filling dendrogram. In Cartesian
-   * coordinates (i.e., if the orientation is not "radial"), a Bar mark is
-   * typically used to fill the space; in polar coordinates ("radial"
-   * orientation), a Wedge mark is used instead.
-   *
-   * @type pv.Mark
-   * @name pv.Layout.cluster.prototype.bar
-   */
-  layout.fill = new pv.Mark()
-      .extend(layout.node)
-      .strokeStyle("#fff")
-      .fillStyle("#ccc")
-      .left(function(n) {
-          switch (orient) {
-            case "left": return scale(n.minDepth, ds) * w;
-            case "right": return (1 - scale(n.maxDepth, ds)) * w;
-            case "top": return n.minBreadth * w;
-            case "bottom": return (1 - n.maxBreadth) * w;
-            case "radial": return w / 2;
-          }
-        })
-      .top(function(n) {
-          switch (orient) {
-            case "left": return n.minBreadth * h;
-            case "right": return (1 - n.maxBreadth) * h;
-            case "top": return scale(n.minDepth, ds) * h;
-            case "bottom": return (1 - scale(n.maxDepth, ds)) * h;
-            case "radial": return h / 2;
-          }
-        })
-      .width(function(n) {
-          switch (orient) {
-            case "left":
-            case "right": return (n.maxDepth - n.minDepth) / (1 + ds) * w;
-            case "top":
-            case "bottom": return (n.maxBreadth - n.minBreadth) * w;
-          }
-        })
-      .height(function(n) {
-          switch (orient) {
-            case "left":
-            case "right": return (n.maxBreadth - n.minBreadth) * h;
-            case "top":
-            case "bottom": return (n.maxDepth - n.minDepth) / (1 + ds) * h;
-          }
-        })
-      .innerRadius(function(n) { return Math.max(0, scale(n.minDepth, ds / 2)) * r; })
-      .outerRadius(function(n) { return scale(n.maxDepth, ds / 2) * r; })
-      .startAngle(function(n) { return (n.parentNode ? n.minBreadth - .25 : 0) * 2 * Math.PI; })
-      .endAngle(function(n) { return (n.parentNode ? n.maxBreadth - .25 : 1) * 2 * Math.PI; });
-
-  return layout;
-};
-pv.Layout.partition = function(map) {
-  var nodes, // cached pv.dom(map).nodes()
-      sort, // optional sort function
-      sizeof = function(n) { return 1; }, // default size function
-      orient = "top", // default orientation
-      w, // cached parent panel width
-      h, // cached parent panel height
-      r, // cached Math.min(w, h) / 2
-      ds; // cached depth step (inverse depth of tree)
 
   /** @private */
-  function size(n) {
-    return n.size = n.firstChild
-        ? pv.sum(n.childNodes, size)
-        : sizeof(n.nodeValue);
+  function x(n) {
+    switch (orient) {
+      case "left": return n.depth * w;
+      case "right": return w - n.depth * w;
+      case "top": return n.breadth * w;
+      case "bottom": return w - n.breadth * w;
+      case "radial": return w / 2 + radius(n) * Math.cos(angle(n));
+    }
   }
 
-  /** @private Compute the maximum depth of descendants for each node. */
-  function depth(n) {
-    return n.firstChild ? (1 + pv.max(n.childNodes, depth)) : 0;
+  /** @private */
+  function y(n) {
+    switch (orient) {
+      case "left": return n.breadth * h;
+      case "right": return h - n.breadth * h;
+      case "top": return n.depth * h;
+      case "bottom": return h - n.depth * h;
+      case "radial": return h / 2 + radius(n) * Math.sin(angle(n));
+    }
   }
+
+  for (var i = 0; i < nodes.length; i++) {
+    var n = nodes[i];
+    n.x = x(n);
+    n.y = y(n);
+    n.angle = angle(n);
+  }
+};
+
+/** A variant of cluster layout that is space-filling. */
+pv.Layout.Cluster.Fill = function() {
+  pv.Layout.Cluster.call(this);
+  pv.Layout.Hierarchy.Fill.constructor.call(this);
+};
+
+pv.Layout.Cluster.Fill.prototype = pv.extend(pv.Layout.Cluster);
+
+pv.Layout.Cluster.Fill.prototype.init = function() {
+  if (pv.Layout.Cluster.prototype.init.call(this)) return;
+  pv.Layout.Hierarchy.Fill.init.call(this);
+};
+pv.Layout.Partition = function() {
+  pv.Layout.Hierarchy.call(this);
+};
+
+pv.Layout.Partition.prototype = pv.extend(pv.Layout.Hierarchy)
+    .property("order", String) // null, ascending, descending?
+    .property("orient", String); // top, left, right, bottom, radial
+
+pv.Layout.Partition.prototype.defaults = new pv.Layout.Partition()
+    .extend(pv.Layout.Hierarchy.prototype.defaults)
+    .orient("top");
+
+pv.Layout.Partition.prototype.$size = function() { return 1; };
+
+pv.Layout.Partition.prototype.size = function(f) {
+  this.$size = f;
+  return this;
+};
+
+pv.Layout.Partition.prototype.init = function() {
+  var that = this,
+      nodes = that.nodes(),
+      root = nodes[0],
+      stack = pv.Mark.stack,
+      order = that.order(),
+      orient = that.orient(),
+      w = that.parent.width(),
+      h = that.parent.height(),
+      r = Math.min(w, h) / 2,
+      maxDepth = 0;
+
+  /* Recursively compute the tree depth and node size. */
+  var maxDepth = 0;
+  stack.unshift(null);
+  root.visitAfter(function(n, i) {
+      if (i > maxDepth) maxDepth = i;
+      n.size = n.firstChild
+          ? pv.sum(n.childNodes, function(n) { return n.size; })
+          : that.$size.apply(that, (stack[0] = n.nodeValue, stack));
+    });
+  stack.shift();
+
+  /* Order */
+  switch (order) {
+    case "ascending": root.sort(function(a, b) { return a.size - b.size; }); break;
+    case "descending": root.sort(function(b, a) { return a.size - b.size; }); break;
+  }
+
+  /* Compute the unit breadth and depth of each node. */
+  var ds = 1 / maxDepth;
+  root.minBreadth = 0;
+  root.breadth = .5;
+  root.maxBreadth = 1;
+  root.visitBefore(function(n) {
+    var b = n.minBreadth, s = n.maxBreadth - b;
+      for (var c = n.firstChild; c; c = c.nextSibling) {
+        c.minBreadth = b;
+        c.maxBreadth = b += (c.size / n.size) * s;
+        c.breadth = (b + c.minBreadth) / 2;
+      }
+    });
+  root.visitAfter(function(n, i) {
+      n.minDepth = (i - 1) * ds;
+      n.maxDepth = n.depth = i * ds;
+    });
+
+  /** @private Returns the radius of the given node. */
+  function radius(n) {
+    return n.parentNode ? (n.depth * r) : 0;
+  }
+
+  /** @private Returns the angle of the given node. */
+  function angle(n) {
+    return orient == "radial"
+        ? (n.parentNode ? (n.breadth - .25) * 2 * Math.PI : 0)
+        : (n.firstChild ? Math.PI : 0);
+  }
+
+  /** @private */
+  function x(n) {
+    switch (orient) {
+      case "left": return n.depth * w;
+      case "right": return w - n.depth * w;
+      case "top": return n.breadth * w;
+      case "bottom": return w - n.breadth * w;
+      case "radial": return w / 2 + radius(n) * Math.cos(n.angle);
+    }
+  }
+
+  /** @private */
+  function y(n) {
+    switch (orient) {
+      case "left": return n.breadth * h;
+      case "right": return h - n.breadth * h;
+      case "top": return n.depth * h;
+      case "bottom": return h - n.depth * h;
+      case "radial": return h / 2 + radius(n) * Math.sin(n.angle);
+    }
+  }
+
+  for (var i = 0; i < nodes.length; i++) {
+    var n = nodes[i];
+    n.angle = angle(n);
+    n.x = x(n);
+    n.y = y(n);
+  }
+};
+
+/** A variant of partition layout that is space-filling. */
+pv.Layout.Partition.Fill = function() {
+  pv.Layout.Partition.call(this);
+  pv.Layout.Hierarchy.Fill.constructor.call(this);
+};
+
+pv.Layout.Partition.Fill.prototype = pv.extend(pv.Layout.Partition);
+
+pv.Layout.Partition.Fill.prototype.init = function() {
+  if (pv.Layout.Partition.prototype.init.call(this)) return;
+  pv.Layout.Hierarchy.Fill.init.call(this);
+};
+/** @class Layout for arc diagrams. */
+pv.Layout.Arc = function() {
+  pv.Layout.Network.call(this);
+  var interpolate, directed, reverse, init = this.init;
+
+  /** @private Cache layout state to optimize properties. */
+  this.init = function() {
+    var orient = this.orient();
+    directed = this.directed();
+    interpolate = orient == "radial" ? "linear" : "polar";
+    reverse = orient == "right" || orient == "top";
+    init.call(this);
+  };
+
+  /* Override link properties to handle directedness and orientation. */
+  this.link
+      .data(function(p) {
+          var s = p.sourceNode, t = p.targetNode;
+          return reverse != (directed || (s.index < t.index)) ? [s, t] : [t, s];
+        })
+      .interpolate(function() { return interpolate; });
+};
+
+pv.Layout.Arc.prototype = pv.extend(pv.Layout.Network)
+    .property("orient", String)
+    .property("directed", Boolean);
+
+pv.Layout.Arc.prototype.defaults = new pv.Layout.Arc()
+    .extend(pv.Layout.Network.prototype.defaults)
+    .orient("bottom");
+
+/** @private Populates the x, y and angle attributes on the nodes. */
+pv.Layout.Arc.prototype.init = function() {
+  if (pv.Layout.Network.prototype.init.call(this)) return;
+  var nodes = this.nodes(),
+      orient = this.orient(),
+      w = this.parent.width(),
+      h = this.parent.height(),
+      r = Math.min(w, h) / 2;
+
+  /** @private Returns the angle, given the breadth. */
+  function angle(b) {
+    switch (orient) {
+      case "top": return -Math.PI / 2;
+      case "bottom": return Math.PI / 2;
+      case "left": return Math.PI;
+      case "right": return 0;
+      case "radial": return (b - .25) * 2 * Math.PI;
+    }
+  }
+
+  /** @private Returns the x-position, given the breadth. */
+  function x(b) {
+    switch (orient) {
+      case "top":
+      case "bottom": return b * w;
+      case "left": return 0;
+      case "right": return w;
+      case "radial": return w / 2 + r * Math.cos(angle(b));
+    }
+  }
+
+  /** @private Returns the y-position, given the breadth. */
+  function y(b) {
+    switch (orient) {
+      case "top": return 0;
+      case "bottom": return h;
+      case "left":
+      case "right": return b * h;
+      case "radial": return h / 2 + r * Math.sin(angle(b));
+    }
+  }
+
+  /* Populate the x, y and angle attributes. */
+  for (var i = 0; i < nodes.length; i++) {
+    var breadth = (i + .5) / nodes.length, n = nodes[i];
+    n.x = x(breadth);
+    n.y = y(breadth);
+    n.angle = angle(breadth);
+  }
+};
+
+/**
+ * The orientation. The default orientation is "left", which means that the root
+ * node is placed on the left edge, leaf nodes appear on the right edge, and
+ * internal nodes are in-between. The following orientations are supported:<ul>
+ *
+ * <li>left - left-to-right.
+ * <li>right - right-to-left.
+ * <li>top - top-to-bottom.
+ * <li>bottom - bottom-to-top.
+ * <li>radial - radially, with the root at the center.</ul>
+ *
+ * @param {string} v the new orientation.
+ * @function
+ * @name pv.Layout.Arc.prototype.orient
+ * @returns {pv.Layout.Arc} this, or the current orientation.
+ */
+
+/**
+ * Whether this arc digram is directed (i.e., bidirectional); only applies to
+ * non-radial orientations. By default, arc digrams are undirected, such that
+ * all arcs appear on one side. If the arc digram is directed, then forward
+ * links are drawn on the conventional side (the same as as undirected
+ * links--right, left, bottom and top for left, right, top and bottom,
+ * respectively), while reverse links are drawn on the opposite side.
+ *
+ * @param {boolean} x whether or not this arc digram is directed.
+ * @function
+ * @name pv.Layout.Arc.prototype.directed
+ * @returns {pv.Layout.Arc} this, or the current directedness.
+ */
+pv.Layout.Horizon = function() {
+  pv.Layout.call(this);
+  var mode, size, red, blue;
 
   /** @private */
   function data() {
-    /* Cache the parent panel dimensions to avoid repeated lookup. */
-    w = this.parent.width();
-    h = this.parent.height();
-    r = Math.min(w, h) / 2;
-
-    /* If the layout was previously computed, use that. */
-    if (nodes) return nodes;
-    nodes = pv.dom(map).nodes();
-
-    /* Sort the tree and compute the initial depth of each node. */
-    var root = nodes[0];
-    size(root);
-    if (sort) root.sort(sort);
-    ds = 1 / depth(root);
-
-    /* Compute the unit breadth and depth of each node. */
-    root.minBreadth = 0;
-    root.breadth = .5;
-    root.maxBreadth = 1;
-    root.visitBefore(function(n) {
-        var b = n.minBreadth, s = n.maxBreadth - b;
-        for (var c = n.firstChild; c; c = c.nextSibling) {
-          c.minBreadth = b;
-          c.maxBreadth = b += (c.size / n.size) * s;
-          c.breadth = (b + c.minBreadth) / 2;
-        }
-      });
-    root.visitAfter(function(n, i) {
-        n.minDepth = (i - 1) * ds;
-        n.maxDepth = n.depth = i * ds;
-      });
-
-    return nodes;
+    mode = this.mode();
+    size = Math.round((mode == "color" ? .5 : 1) * this.parent.height());
+    var n = this.bands(), fill = this.backgroundStyle();
+    red = pv.Scale.linear(0, n).range(fill, this.negativeStyle());
+    blue = pv.Scale.linear(0, n).range(fill, this.positiveStyle());
+    return pv.range(n * 2);
   }
 
-  /** @private The layout, on which all public methods are registered. */
-  var layout = {};
+  /* Set the fill style directly, rather than using the alias. */
+  this.propertyValue("fillStyle", function(i) {
+      return i ? null : this.backgroundStyle();
+    }).type = 3;
 
-  /**
-   * Sets or gets the orientation. The default orientation is "left", which
-   * means that the root node is placed on the left edge, leaf nodes appear on
-   * the right edge, and internal nodes are in-between. The following
-   * orientations are supported:<ul>
-   *
-   * <li>left - left-to-right.
-   * <li>right - right-to-left.
-   * <li>top - top-to-bottom.
-   * <li>bottom - bottom-to-top.
-   * <li>radial - radially, with the root at the center.</ul>
-   *
-   * @param {string} v the new orientation.
-   * @function
-   * @name pv.Layout.partition.prototype.orient
-   * @returns {pv.Layout.partition} this, or the current orientation.
-   */
-  layout.orient = function(v) {
-    if (arguments.length) {
-      orient = v;
-      return this;
-    }
-    return orient;
-  };
-
-  /**
-   * Sets or gets the sort function. The sort function is applied to the tree
-   * before the layout is computed; it is a comparator function which takes two
-   * arguments and returns a negative number, a positive number, or zero as
-   * appropriate. For example, to sort on the node names:
-   *
-   * <pre>  .sort(function(a, b) pv.naturalOrder(a.nodeName, b.nodeName))</pre>
-   *
-   * @param {funtion} f the new sort function.
-   * @function
-   * @name pv.Layout.partition.prototype.sort
-   * @returns {pv.Layout.partition} this, or the current sort function.
-   * @see pv.naturalOrder
-   * @see pv.Dom.Node.prototype.sort
-   */
-  layout.sort = function(f) {
-    if (arguments.length) {
-      sort = f;
-      return this;
-    }
-    return sort;
-  };
-
-  /**
-   * Returns the nodes associated with this layout.
-   *
-   * @function
-   * @name pv.Layout.partition.prototype.nodes
-   * @returns {array}
-   */
-  layout.nodes = data;
-
-  /**
-   * Returns the links associated with this layout. Each link is represented as
-   * a two-element array; the first element is the child node, and the second
-   * element is the parent node.
-   *
-   * @function
-   * @name pv.Layout.partition.prototype.links
-   * @returns {array}
-   */
-  layout.links = function() {
-    return data.call(this)
-        .filter(function(n) { return n.parentNode; })
-        .map(function(n) { return [n, n.parentNode]; });
-  };
-
-  /**
-   * Sets or gets the sizing function. By default, the size of all leaf nodes is
-   * constant. The aggregate sizes of internal (non-leaf) nodes is computed
-   * automatically by the layout.
-   *
-   * <p>For example, if the tree data structure represents a file system, with
-   * files as leaf nodes, and each file has a <tt>bytes</tt> attribute, you can
-   * specify a size function as:
-   *
-   * <pre>.size(function(d) d.bytes)</pre>
-   *
-   * <p>Note that the built-in <tt>Number</tt>, <tt>Math.sqrt</tt> and
-   * <tt>Math.log</tt> methods can be used as sizing functions, provided the
-   * node values are numbers.
-   *
-   * @param {function} f the new sizing function.
-   * @function
-   * @name pv.Layout.partition.prototype.size
-   * @returns {pv.Layout.partition} this.
-   */
-  layout.size = function(f) {
-    if (arguments.length) {
-      sizeof = f;
-      return this;
-    }
-    return sizeof;
-  };
-
-  /** @private Returns the radius of the given node. */
-  function radius(n) {
-    return n.parentNode ? (n.depth * r) : 0;
-  }
-
-  /** @private Returns the angle of the given node. */
-  function angle(n) {
-    return n.parentNode ? (n.breadth - .25) * 2 * Math.PI : 0;
-  }
-
-  /** @private Scales the specified depth for a space-filling layout. */
-  function scale(d, ds) {
-    return (d + ds) / (1 + ds);
-  }
-
-  /**
-   * The node prototype. This prototype is intended to be used with a Dot mark
-   * in conjunction with the link prototype.
-   *
-   * @type pv.Mark
-   * @name pv.Layout.partition.prototype.node
-   */
-  layout.node = new pv.Mark()
+  this.bands(2)
+      .mode("offset")
+      .backgroundStyle("white")
+      .positiveStyle("#1f77b4")
+      .negativeStyle("#d62728")
       .data(data)
-      .strokeStyle("#1f77b4")
-      .fillStyle("#fff")
-      .left(function(n) {
-          switch (orient) {
-            case "left": return n.depth * w;
-            case "right": return w - n.depth * w;
-            case "top": return n.breadth * w;
-            case "bottom": return w - n.breadth * w;
-            case "radial": return w / 2 + radius(n) * Math.cos(angle(n));
-          }
+      .overflow("hidden")
+      .height(function() { return size; })
+      .top(function(i) { return mode == "color" ? (i & 1) * size : 0; });
+
+  this.band = new pv.Mark()
+      .top(function(d, i) {
+          return mode == "mirror" && i & 1
+              ? (i + 1 >> 1) * size
+              : null;
         })
-      .top(function(n) {
-          switch (orient) {
-            case "left": return n.breadth * h;
-            case "right": return h - n.breadth * h;
-            case "top": return n.depth * h;
-            case "bottom": return h - n.depth * h;
-            case "radial": return h / 2 + radius(n) * Math.sin(angle(n));
-          }
+      .bottom(function(d, i) {
+          return mode == "mirror"
+              ? (i & 1 ? null : (i + 1 >> 1) * -size)
+              : ((i & 1 || -1) * (i + 1 >> 1) * size);
+        })
+      .fillStyle(function(d, i) {
+          return (i & 1 ? red : blue)((i >> 1) + 1);
         });
 
-  /**
-   * The link prototype, which renders edges between child nodes and their
-   * parents. This prototype is intended to be used with a Line mark in
-   * conjunction with the node prototype.
-   *
-   * @type pv.Mark
-   * @name pv.Layout.partition.prototype.link
-   */
-  layout.link = new pv.Mark()
-      .extend(layout.node)
-      .data(pv.identity)
-      .strokeStyle("#ccc")
-      .fillStyle(null);
-
-  /**
-   * The node label prototype, which renders the node name adjacent to the node.
-   * This prototype is provided as an alternative to using the anchor on the
-   * node or fill mark; it is primarily intended to be used with radial
-   * node-link layouts, since it provides a convenient mechanism to set the text
-   * angle.
-   *
-   * @type pv.Mark
-   * @name pv.Layout.partition.prototype.label
-   */
-  layout.label = new pv.Mark()
-      .extend(layout.node)
-      .textMargin(7)
-      .textBaseline("middle")
-      .text(function(n) { return n.parentNode ? n.nodeName : "root"; })
-      .textAngle(function(n) {
-          if (orient != "radial") return 0;
-          var a = angle(n);
-          return pv.Wedge.upright(a) ? a : (a + Math.PI);
-        })
-      .textAlign(function(n) {
-          if (orient != "radial") return n.firstChild ? "right" : "left";
-          return pv.Wedge.upright(angle(n)) ? "left" : "right";
-        });
-
-  /**
-   * The fill prototype, used for a space-filling partition. In Cartesian
-   * coordinates (i.e., if the orientation is not "radial"), a Bar mark is
-   * typically used to fill the space; in polar coordinates ("radial"
-   * orientation), a Wedge mark is used instead.
-   *
-   * @type pv.Mark
-   * @name pv.Layout.partition.prototype.bar
-   */
-  layout.fill = new pv.Mark()
-      .data(data)
-      .strokeStyle("#fff")
-      .fillStyle("#ccc")
-      .left(function(n) {
-          switch (orient) {
-            case "left": return scale(n.minDepth, ds) * w;
-            case "right": return (1 - scale(n.maxDepth, ds)) * w;
-            case "top": return n.minBreadth * w;
-            case "bottom": return (1 - n.maxBreadth) * w;
-            case "radial": return w / 2;
-          }
-        })
-      .top(function(n) {
-          switch (orient) {
-            case "left": return n.minBreadth * h;
-            case "right": return (1 - n.maxBreadth) * h;
-            case "top": return scale(n.minDepth, ds) * h;
-            case "bottom": return (1 - scale(n.maxDepth, ds)) * h;
-            case "radial": return h / 2;
-          }
-        })
-      .width(function(n) {
-          switch (orient) {
-            case "left":
-            case "right": return (n.maxDepth - n.minDepth) / (1 + ds) * w;
-            case "top":
-            case "bottom": return (n.maxBreadth - n.minBreadth) * w;
-          }
-        })
-      .height(function(n) {
-          switch (orient) {
-            case "left":
-            case "right": return (n.maxBreadth - n.minBreadth) * h;
-            case "top":
-            case "bottom": return (n.maxDepth - n.minDepth) / (1 + ds) * h;
-          }
-        })
-      .innerRadius(function(n) { return Math.max(0, scale(n.minDepth, ds / 2)) * r; })
-      .outerRadius(function(n) { return scale(n.maxDepth, ds / 2) * r; })
-      .startAngle(function(n) { return (n.minBreadth - .25) * 2 * Math.PI; })
-      .endAngle(function(n) { return (n.maxBreadth - .25) * 2 * Math.PI; });
-
-  return layout;
+  var add = this.add;
+  this.add = function(type) {
+    return add.call(this, pv.Panel).add(type).extend(this.band);
+  };
 };
-pv.Layout.arc = function(nodes, links) {
-  var orient = "top",
-      directed = false,
-      w, // the cached parent panel width
-      h, // cached parent panel height
-      r; // cached Math.min(w, h) / 2
+
+pv.Layout.Horizon.prototype = pv.extend(pv.Layout)
+    .property("bands", Number)
+    .property("mode", String) // mirror, offset, color
+    .property("backgroundStyle", pv.color)
+    .property("negativeStyle", pv.color)
+    .property("positiveStyle", pv.color);
+
+pv.Layout.Horizon.prototype.fillStyle = pv.Layout.Horizon.prototype.backgroundStyle;
+pv.Layout.Rollup = function() {
+  pv.Layout.Network.call(this);
+  var that = this;
+
+  /* Evaluate positional properties on each node. */
+  this.data(function() { return that.nodes(); });
+
+  /* Render rollup nodes. */
+  this.node
+      .data(function() { return that.scene.$rollup.nodes; })
+      .size(function(d) { return d.nodes.length * 20; });
+
+  /* Render rollup links. */
+  var add = this.link.add;
+  this.link.add = function(type) {
+      var mark = add.call(this, type);
+      mark.parent.data(function() { return that.scene.$rollup.links; });
+      return mark;
+    };
+};
+
+pv.Layout.Rollup.prototype = pv.extend(pv.Layout.Network)
+    .property("directed", Boolean);
+
+pv.Layout.Rollup.prototype.init = function() {
+  if (pv.Layout.Network.prototype.init.call(this)) return;
+  delete this.scene.$rollup;
+};
+
+pv.Layout.Rollup.prototype.build = function() {
+  pv.Layout.Network.prototype.build.call(this);
+  if (this.scene.$rollup) return;
+  var scene = this.scene,
+      nodes = this.nodes(),
+      links = this.links(),
+      directed = this.directed(),
+      rnindex = 0,
+      rnodes = {},
+      rlinks = {};
 
   /** @private */
-  function init() {
-    w = this.parent.width();
-    h = this.parent.height();
-    r = Math.min(w, h) / 2;
-    for (var i = 0, n = nodes.length; i < n; i++) {
-      nodes[i].breadth = (i + .5) / n;
-    }
+  function id(i) {
+    return scene[i].left + "," + scene[i].top;
   }
 
-  /** @private The layout, on which all public methods are registered. */
-  var layout = {};
-
-  /**
-   * Sets or gets the orientation. The default orientation is "left", which
-   * means that the root node is placed on the left edge, leaf nodes appear on
-   * the right edge, and internal nodes are in-between. The following
-   * orientations are supported:<ul>
-   *
-   * <li>left - left-to-right.
-   * <li>right - right-to-left.
-   * <li>top - top-to-bottom.
-   * <li>bottom - bottom-to-top.
-   * <li>radial - radially, with the root at the center.</ul>
-   *
-   * @param {string} v the new orientation.
-   * @function
-   * @name pv.Layout.arc.prototype.orient
-   * @returns {pv.Layout.arc} this, or the current orientation.
-   */
-  layout.orient = function(v) {
-    if (arguments.length) {
-      orient = String(v);
-      return this;
+  /* Compute rollup nodes. */
+  for (var i = 0; i < nodes.length; i++) {
+    var nodeId = id(i),
+        rn = rnodes[nodeId];
+    if (!rn) {
+      rn = rnodes[nodeId] = pv.extend(nodes[i]);
+      rn.index = rnindex++;
+      rn.x = scene[i].left;
+      rn.y = scene[i].top;
+      rn.nodes = [];
     }
-    return orient;
-  };
-
-  /**
-   * Sets or gets whether this arc digram is directed (bidirectional). By
-   * default, arc digrams are undirected, such that all arcs will appear on one
-   * side (for non-radial orientations). If the arc digram is directed, then
-   * forward links will exist on the conventional side (the same as as
-   * undirected links--right, left, bottom and top for left, right, top and
-   * bottom, respectively), while reverse links exist on the opposite side.
-   *
-   * @param {boolean} x whether or not this arc digram is directed.
-   * @function
-   * @name pv.Layout.arc.prototype.directed
-   * @returns {pv.Layout.arc} this, or the current directedness.
-   */
-  layout.directed = function(x) {
-    if (arguments.length) {
-      directed = Boolean(x);
-      return this;
-    }
-    return directed;
-  };
-
-  /**
-   * Returns the nodes associated with this layout.
-   *
-   * @function
-   * @name pv.Layout.arc.prototype.nodes
-   * @returns {array}
-   */
-  layout.nodes = nodes = nodes.map(function(d, i) {
-      return {nodeName: i, nodeValue: d, linkDegree: 0};
-    });
-
-  /**
-   * Returns the links associated with this layout. Each link is represented as
-   * a two-element array; the first element is the source node, and the second
-   * element is the target node.
-   *
-   * @function
-   * @name pv.Layout.arc.prototype.links
-   * @returns {array}
-   */
-  layout.links = links = links.map(function(d) {
-      var s = nodes[d.source],
-          t = nodes[d.target],
-          l = [s, t],
-          v = isNaN(d.value) ? 1 : d.value;
-      s.linkDegree += v;
-      t.linkDegree += v;
-      l.linkValue = v;
-      return l;
-    });
-
-  /** @private Returns the angle of the given node. */
-  function angle(n) {
-    return (n.breadth - .25) * 2 * Math.PI;
+    rn.nodes.push(nodes[i]);
   }
 
-  /**
-   * The node prototype. This prototype is intended to be used with a Dot mark
-   * in conjunction with the link prototype.
-   *
-   * @type pv.Mark
-   * @name pv.Layout.arc.prototype.node
-   */
-  layout.node = new pv.Mark()
-      .def("init", init)
-      .data(nodes)
-      .strokeStyle("#1f77b4")
-      .fillStyle("#fff")
-      .left(function(n) {
-          switch (orient) {
-            case "top":
-            case "bottom": return n.breadth * w;
-            case "left": return 0;
-            case "right": return w;
-            case "radial": return w / 2 + r * Math.cos(angle(n));
-          }
-        })
-      .top(function top(n) {
-          switch (orient) {
-            case "top": return 0;
-            case "bottom": return h;
-            case "left":
-            case "right": return n.breadth * h;
-            case "radial": return h / 2 + r * Math.sin(angle(n));
-          }
-        });
+  /* Compute rollup links. */
+  for (var i = 0; i < links.length; i++) {
+    var source = links[i].sourceNode,
+        target = links[i].targetNode,
+        rsource = rnodes[id(source.index)],
+        rtarget = rnodes[id(target.index)],
+        reverse = !directed && rsource.index > rtarget.index,
+        linkId = reverse
+            ? rtarget.index + "," + rsource.index
+            : rsource.index + "," + rtarget.index,
+        rl = rlinks[linkId];
+    if (!rl) {
+      rl = rlinks[linkId] = {
+        sourceNode: rsource,
+        targetNode: rtarget,
+        linkValue: 0,
+        links: []
+      };
+    }
+    rl.links.push(links[i]);
+    rl.linkValue += links[i].linkValue;
+  }
 
-  /**
-   * The link prototype, which renders edges between child nodes and their
-   * parents. This prototype is intended to be used with a Line mark in
-   * conjunction with the node prototype.
-   *
-   * @type pv.Mark
-   * @name pv.Layout.arc.prototype.link
-   */
-  layout.link = new pv.Mark()
-      .extend(layout.node)
-      .interpolate(function() {
-          return (orient == "radial") ? "linear" : "polar";
-        })
-      .data(function(p) {
-          return (directed || (p[0].breadth < p[1].breadth))
-              ? p // no reverse necessary, arc will be drawn as intended
-              : [p[1], p[0]];
-        })
-      .fillStyle(null)
-      .lineWidth(function(d, p) { return p.linkValue * 1.5; })
-      .strokeStyle("rgba(0,0,0,.2)");
-
-  /**
-   * The node label prototype, which renders the node name adjacent to the node.
-   * This prototype is provided as an alternative to using the anchor on the
-   * node mark; it is primarily intended to be used with radial node-link
-   * layouts, since it provides a convenient mechanism to set the text angle.
-   *
-   * @type pv.Mark
-   * @name pv.Layout.arc.prototype.label
-   */
-  layout.label = new pv.Mark()
-      .extend(layout.node)
-      .textMargin(7)
-      .textBaseline("middle")
-      .text(function(n) { return n.nodeValue; })
-      .textAngle(function(n) {
-          switch (orient) {
-            case "top":
-            case "bottom": return -Math.PI / 2;
-            case "left":
-            case "right": return 0;
-          }
-          var a = angle(n);
-          return pv.Wedge.upright(a) ? a : (a + Math.PI);
-        })
-      .textAlign(function(n) {
-          switch (orient) {
-            case "top":
-            case "right": return "left";
-            case "bottom":
-            case "left": return "right";
-          }
-          return pv.Wedge.upright(angle(n)) ? "left" : "right";
-        });
-
-  return layout;
+  /* Export the rolled up nodes and links to the scene. */
+  this.scene.$rollup = {
+    nodes: pv.values(rnodes),
+    links: pv.values(rlinks)
+  };
 };
-
 /**
  * @ignore
  * @namespace
  */
 pv.Behavior = {};
 pv.Behavior.drag = function() {
-  var target, scene, index, p, v1;
-
-  /* Setup the scene stack. */
-  function setup() {
-    var m = target, s = scene, i = index;
-    do {
-      m.index = i;
-      m.scene = s;
-      i = s.parentIndex;
-      s = s.parent;
-    } while (m = m.parent);
-  }
+  var scene, // scene context
+      index, // scene context
+      p, // particle being dragged
+      v1; // initial mouse-particle offset
 
   function mousedown(d) {
-    target = this;
-    index = target.index;
-    scene = target.scene;
+    index = this.index;
+    scene = this.scene;
     var m = this.mouse();
     v1 = pv.vector(d.x, d.y).minus(m);
     p = d;
@@ -10825,24 +10956,107 @@ pv.Behavior.drag = function() {
   }
 
   function mousemove() {
-    if (!target) return;
-    setup();
-    var m = target.mouse();
-    p.x = v1.x + m.x;
-    p.y = v1.y + m.y;
+    if (!scene) return;
+    scene.mark.context(scene, index, function() {
+        var m = this.mouse();
+        p.x = v1.x + m.x;
+        p.y = v1.y + m.y;
+      });
   }
 
   function mouseup() {
-    if (!target) return;
+    if (!scene) return;
     mousemove();
     p.fixed = false;
     p = null;
-    target = null;
+    scene = null;
   }
 
   pv.listen(window, "mousemove", mousemove);
   pv.listen(window, "mouseup", mouseup);
   return mousedown;
+};
+pv.Behavior.point = function(r) {
+  var unpoint, // the current pointer target
+      collapse = null, // dimensions to collapse
+      kx = 1, // x-dimension cost scale
+      ky = 1, // y-dimension cost scale
+      r2 = arguments.length ? r * r : 900; // fuzzy radius
+
+  /** @private Creates a fake mouse event of the specified type. */
+  function event(type) {
+    var e = document.createEvent("MouseEvents");
+    e.initEvent(type, true, false);
+    return e;
+  }
+
+  /** @Private Search for the mark closest to the mouse. */
+  function search(scene, index) {
+    var s = scene[index],
+        point = {cost: Infinity};
+    for (var i = 0, n = s.children.length; i < n; i++) {
+      var child = s.children[i], mark = child.mark, p;
+      if (mark.type == "panel") {
+        mark.scene = child;
+        for (var j = 0, m = child.length; j < m; j++) {
+          mark.index = j;
+          p = search(child, j);
+          if (p.cost < point.cost) point = p;
+        }
+        delete mark.scene;
+        delete mark.index;
+      } else if (mark.$handlers.point) {
+        var v = mark.mouse();
+        for (var j = 0, m = child.length; j < m; j++) {
+          var c = child[j],
+              dx = v.x - c.left,
+              dy = v.y - c.top,
+              dd = kx * dx * dx + ky * dy * dy;
+          if (dd < point.cost) {
+            point.distance = dx * dx + dy * dy;
+            point.cost = dd;
+            point.scene = child;
+            point.index = j;
+          }
+        }
+      }
+    }
+    return point;
+  }
+
+  function mousemove() {
+    /* If the closest mark is far away, clear the current target. */
+    var point = search(this.scene, this.index);
+    if ((point.cost == Infinity) || (point.distance > r2)) point = null;
+
+    /* Unpoint the old target, if it's not the new target. */
+    if (unpoint) {
+      if (point
+          && (unpoint.scene == point.scene)
+          && (unpoint.index == point.index)) return;
+      pv.Mark.dispatch(event("unpoint"), unpoint.scene, unpoint.index);
+    }
+
+    /* Point the new target, if there is one. */
+    if (unpoint = point) {
+      pv.Mark.dispatch(event("point"), point.scene, point.index);
+    }
+  }
+
+  mousemove.collapse = function(x) {
+    if (arguments.length) {
+      collapse = String(x);
+      switch (collapse) {
+        case "y": kx = 1; ky = 0; break;
+        case "x": kx = 0; ky = 1; break;
+        default: kx = 1; ky = 1; break;
+      }
+      return mousemove;
+    }
+    return collapse;
+  };
+
+  return mousemove;
 };
 pv.Behavior.select = function(f) {
   var target, m1, index, scenes, args, region;
@@ -10896,56 +11110,46 @@ pv.Behavior.select = function(f) {
   pv.listen(window, "mouseup", mouseup);
   return mousedown;
 };
-pv.Behavior.transform = function() {
-  var transform = {},
-      target,
-      scene,
-      index,
-      m = pv.Transform.identity, // current transformation matrix
+pv.Behavior.pan = function() {
+  var scene, // scene context
+      index, // scene context
       m1, // transformation matrix at the start of panning
-      v1; // mouse location at the start of panning
+      v1, // mouse location at the start of panning
+      k; // inverse scale
 
-  /* Setup the scene stack. */
-  function setup() {
-    var m = target, s = scene, i = index;
-    do {
-      m.index = i;
-      m.scene = s;
-      i = s.parentIndex;
-      s = s.parent;
-    } while (m = m.parent);
-  }
-
-  transform.pan = function() {
-    target = this;
+  function mousedown() {
     index = this.index;
     scene = this.scene;
     v1 = pv.vector(pv.event.pageX, pv.event.pageY);
-    m1 = m;
-  };
-
-  transform.zoom = function() {
-    var v = this.mouse(), k = window.event.wheelDelta;
-    this.transform(m = m.translate(v.x, v.y)
-        .scale((k < 0) ? (1000 / (1000 - k)) : ((1000 + k) / 1000))
-        .translate(-v.x, -v.y)).render();
-  };
+    m1 = this.transform();
+    k = 1 / (m1.k * this.scale);
+  }
 
   function mousemove() {
-    if (!target) return;
-    setup();
-    var x = (pv.event.pageX - v1.x) / m.k, y = (pv.event.pageY - v1.y) / m.k;
-    target.transform(m = m1.translate(x, y)).render();
+    if (!scene) return;
+    scene.mark.context(scene, index, function() {
+        var x = (pv.event.pageX - v1.x) * k,
+            y = (pv.event.pageY - v1.y) * k;
+        this.transform(m1.translate(x, y)).render();
+      });
   }
 
   function mouseup() {
     mousemove();
-    target = null;
+    scene = null;
   }
 
   pv.listen(window, "mousemove", mousemove);
   pv.listen(window, "mouseup", mouseup);
-  return transform;
+  return mousedown;
+};
+pv.Behavior.zoom = function() {
+  return function() {
+      var v = this.mouse(), k = window.event.wheelDelta;
+      this.transform(this.transform().translate(v.x, v.y)
+          .scale((k < 0) ? (1000 / (1000 - k)) : ((1000 + k) / 1000))
+          .translate(-v.x, -v.y)).render();
+    };
 };
 /*
  * Parses the Protovis specifications on load, allowing the use of JavaScript

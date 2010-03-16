@@ -9,7 +9,7 @@ pv.SvgScene.dot = function(scenes) {
     if (!fill.opacity && !stroke.opacity) continue;
 
     /* points */
-    var radius = s.radius, path;
+    var radius = s.radius, path = null;
     switch (s.shape) {
       case "cross": {
         path = "M" + -radius + "," + -radius
@@ -52,6 +52,7 @@ pv.SvgScene.dot = function(scenes) {
     /* Use <circle> for circles, <path> for everything else. */
     var svg = {
       "shape-rendering": s.antialias ? null : "crispEdges",
+      "pointer-events": s.events,
       "fill": fill.color,
       "fill-opacity": fill.opacity || null,
       "stroke": stroke.color,

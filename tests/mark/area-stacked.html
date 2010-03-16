@@ -26,10 +26,9 @@ var vis = new pv.Panel()
     .top(5)
     .strokeStyle("#ccc");
 
-vis.add(pv.Panel)
+vis.add(pv.Layout.Stack)
     .data(data)
   .add(pv.Area)
-    .extend(pv.Layout.stack())
     .left(function(d) x(d.x))
     .height(function(d) y(d.y));
 

@@ -11,13 +11,11 @@ pv.Scene = pv.SvgScene = {
   /** The pre-multipled scale, based on any enclosing transforms. */
   scale: 1,
 
-  /** A globally unique ID used to refer to clip-paths and such. */
-  id: 0,
-
   /** Implicit values for SVG and CSS properties. */
   implicit: {
     svg: {
       "shape-rendering": "auto",
+      "pointer-events": "painted",
       "x": 0,
       "y": 0,
       "dy": 0,
@@ -41,8 +39,8 @@ pv.Scene = pv.SvgScene = {
  * @param scenes {array} an array of scene nodes.
  */
 pv.SvgScene.updateAll = function(scenes) {
-  if (!scenes.length) return;
-  if ((scenes[0].reverse)
+  if (scenes.length
+      && scenes[0].reverse
       && (scenes.type != "line")
       && (scenes.type != "area")) {
     var reversed = pv.extend(scenes);
@@ -157,3 +155,6 @@ pv.SvgScene.removeSiblings = function(e) {
     e = n;
   }
 };
+
+/** @private Do nothing when rendering undefined mark types. */
+pv.SvgScene.undefined = function() {};

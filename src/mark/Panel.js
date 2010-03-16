@@ -126,14 +126,16 @@ pv.Panel.prototype.defaults = new pv.Panel()
 pv.Panel.prototype.anchor = function(name) {
 
   /* A "view" of this panel whose margins appear to be zero. */
-  function z() { return 0; }
-  z.prototype = pv.extend(this);
-  z.prototype.left = z.prototype.right = z.prototype.top = z.prototype.bottom = z;
+  var target = pv.extend(this);
+  target.parent = this;
+  target.instance = function() {
+      var s = pv.extend(this.parent.instance());
+      s.right = s.top = s.left = s.bottom = 0;
+      return s;
+    };
 
-  var anchor = pv.Bar.prototype.anchor.call(new z(), name)
+  return pv.Bar.prototype.anchor.call(target, name)
       .data(function(d) { return [d]; });
-  anchor.parent = this;
-  return anchor;
 };
 
 /**
@@ -174,6 +176,7 @@ pv.Panel.prototype.bind = function() {
  */
 pv.Panel.prototype.buildInstance = function(s) {
   pv.Bar.prototype.buildInstance.call(this, s);
+  if (!s.visible) return;
   if (!s.children) s.children = [];
 
   /*
