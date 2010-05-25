@@ -88,7 +88,7 @@ pv.Panel.prototype.type = "panel";
  *
  * @type string
  * @name pv.Panel.prototype.overflow
- * @see http://www.w3.org/TR/CSS2/visufx.html#overflow
+ * @see <a href="http://www.w3.org/TR/CSS2/visufx.html#overflow">CSS2</a>
  */
 
 /**
@@ -99,7 +99,7 @@ pv.Panel.prototype.type = "panel";
  *
  * @type pv.Transform
  * @name pv.Panel.prototype.transform
- * @see pv.Mark.prototype.scale
+ * @see pv.Mark#scale
  */
 
 /**
@@ -114,28 +114,17 @@ pv.Panel.prototype.defaults = new pv.Panel()
     .overflow("visible");
 
 /**
- * Returns an anchor with the specified name. This method is overridden since
- * the behavior of Panel anchors is slightly different from normal anchors:
- * adding to an anchor adds to the anchor target's, rather than the anchor
- * target's parent. To avoid double margins, we override the anchor's proto so
- * that the margins are zero.
+ * Returns an anchor with the specified name. This method is overridden such
+ * that adding to a panel's anchor adds to the panel, rather than to the panel's
+ * parent.
  *
  * @param {string} name the anchor name; either a string or a property function.
  * @returns {pv.Anchor} the new anchor.
  */
 pv.Panel.prototype.anchor = function(name) {
-
-  /* A "view" of this panel whose margins appear to be zero. */
-  var target = pv.extend(this);
-  target.parent = this;
-  target.instance = function() {
-      var s = pv.extend(this.parent.instance());
-      s.right = s.top = s.left = s.bottom = 0;
-      return s;
-    };
-
-  return pv.Bar.prototype.anchor.call(target, name)
-      .data(function(d) { return [d]; });
+  var anchor = pv.Bar.prototype.anchor.call(this, name);
+  anchor.parent = this;
+  return anchor;
 };
 
 /**

@@ -43,14 +43,9 @@ pv.SvgScene.panel = function(scenes) {
             svgweb.appendChild (g, s.canvas);
             g = frag;
         } else {
-            g.onclick
-                = g.onmousedown
-                = g.onmouseup
-                = g.onmousemove
-                = g.onmouseout
-                = g.onmouseover
-                = g.onmousewheel
-                = this.dispatch;
+            for (var j = 0; j < this.events.length; j++) {
+              g.addEventListener(this.events[j], this.dispatch, false);
+            }
             g = s.canvas.appendChild(g);
         }
 

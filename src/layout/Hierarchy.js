@@ -1,4 +1,37 @@
-/** @class Abstract layout for hierarchies. */
+/**
+ * Constructs a new, empty hierarchy layout. Layouts are not typically
+ * constructed directly; instead, they are added to an existing panel via
+ * {@link pv.Mark#add}.
+ *
+ * @class Represents an abstract layout for hierarchy diagrams. This class is a
+ * specialization of {@link pv.Layout.Network}, providing the basic structure
+ * for both hierarchical node-link diagrams (such as Reingold-Tilford trees) and
+ * space-filling hierarchy diagrams (such as sunbursts and treemaps).
+ *
+ * <p>Unlike general network layouts, the <tt>links</tt> property need not be
+ * defined explicitly. Instead, the links are computed implicitly from the
+ * <tt>parentNode</tt> attribute of the node objects, as defined by the
+ * <tt>nodes</tt> property. This implementation is also available as
+ * {@link #links}, for reuse with non-hierarchical layouts; for example, to
+ * render a tree using force-directed layout.
+ *
+ * <p>Correspondingly, the <tt>nodes</tt> property is represented as a union of
+ * {@link pv.Layout.Network.Node} and {@link pv.Dom.Node}. To construct a node
+ * hierarchy from a simple JSON map, use the {@link pv.Dom} operator; this
+ * operator also provides an easy way to sort nodes before passing them to the
+ * layout.
+ *
+ * <p>For more details on how to use this layout, see
+ * {@link pv.Layout.Network}.
+ *
+ * @see pv.Layout.Cluster
+ * @see pv.Layout.Partition
+ * @see pv.Layout.Tree
+ * @see pv.Layout.Treemap
+ * @see pv.Layout.Indent
+ * @see pv.Layout.Pack
+ * @extends pv.Layout.Network
+ */
 pv.Layout.Hierarchy = function() {
   pv.Layout.Network.call(this);
   this.link.strokeStyle("#ccc");
@@ -6,24 +39,13 @@ pv.Layout.Hierarchy = function() {
 
 pv.Layout.Hierarchy.prototype = pv.extend(pv.Layout.Network);
 
-/** @private Alias the data property to nodes. */
-pv.Layout.Hierarchy.prototype.data = pv.Layout.Hierarchy.prototype.nodes;
-
-/** @private Register an implicit links property. */
-pv.Layout.Hierarchy.prototype.bind = function() {
-  pv.Layout.Network.prototype.bind.call(this);
-  var binds = this.binds;
-  if (!binds.properties.links) {
-    var p = this.propertyValue("links", pv.Layout.Hierarchy.links);
-    p.type = 1;
-    binds.defs.push(p);
-  }
+/** @private Compute the implied links. (Links are null by default.) */
+pv.Layout.Hierarchy.prototype.buildImplied = function(s) {
+  if (!s.links) s.links = pv.Layout.Hierarchy.links.call(this);
+  pv.Layout.Network.prototype.buildImplied.call(this, s);
 };
 
-/**
- * The default links property; computes links using the <tt>parentNode</tt>
- * attribute.
- */
+/** The implied links; computes links using the <tt>parentNode</tt> attribute. */
 pv.Layout.Hierarchy.links = function() {
   return this.nodes()
       .filter(function(n) { return n.parentNode; })
@@ -36,12 +58,73 @@ pv.Layout.Hierarchy.links = function() {
       });
 };
 
-/** @private */
+/** @private Provides standard node-link layout based on breadth & depth. */
+pv.Layout.Hierarchy.NodeLink = {
+
+  /** @private */
+  buildImplied: function(s) {
+    var nodes = s.nodes,
+        orient = s.orient,
+        horizontal = /^(top|bottom)$/.test(orient),
+        w = s.width,
+        h = s.height;
+
+    /* Compute default inner and outer radius. */
+    if (orient == "radial") {
+      var ir = s.innerRadius, or = s.outerRadius;
+      if (ir == null) ir = 0;
+      if (or == null) or = Math.min(w, h) / 2;
+    }
+
+    /** @private Returns the radius of the given node. */
+    function radius(n) {
+      return n.parentNode ? (n.depth * (or - ir) + ir) : 0;
+    }
+
+    /** @private Returns the angle of the given node. */
+    function midAngle(n) {
+      return (n.parentNode ? (n.breadth - .25) * 2 * Math.PI : 0);
+    }
+
+    /** @private */
+    function x(n) {
+      switch (orient) {
+        case "left": return n.depth * w;
+        case "right": return w - n.depth * w;
+        case "top": return n.breadth * w;
+        case "bottom": return w - n.breadth * w;
+        case "radial": return w / 2 + radius(n) * Math.cos(n.midAngle);
+      }
+    }
+
+    /** @private */
+    function y(n) {
+      switch (orient) {
+        case "left": return n.breadth * h;
+        case "right": return h - n.breadth * h;
+        case "top": return n.depth * h;
+        case "bottom": return h - n.depth * h;
+        case "radial": return h / 2 + radius(n) * Math.sin(n.midAngle);
+      }
+    }
+
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
+      n.midAngle = orient == "radial" ? midAngle(n)
+          : horizontal ? Math.PI / 2 : 0;
+      n.x = x(n);
+      n.y = y(n);
+      if (n.firstChild) n.midAngle += Math.PI;
+    }
+  }
+};
+
+/** @private Provides standard space-filling layout based on breadth & depth. */
 pv.Layout.Hierarchy.Fill = {
 
   /** @private */
   constructor: function() {
-    var node = this.node
+    this.node
         .strokeStyle("#fff")
         .fillStyle("#ccc")
         .width(function(n) { return n.dx; })
@@ -51,34 +134,42 @@ pv.Layout.Hierarchy.Fill = {
         .startAngle(function(n) { return n.startAngle; })
         .angle(function(n) { return n.angle; });
 
-    /** @private Adding to this layout implicitly adds to this node. */
-    this.add = function(type) { return this.parent.add(type).extend(node); };
+    this.label
+        .textAlign("center")
+        .left(function(n) { return n.x + (n.dx / 2); })
+        .top(function(n) { return n.y + (n.dy / 2); });
 
-    /* Now hide references to inherited marks. */
-    delete this.node;
-    delete this.label;
+    /* Hide unsupported link. */
     delete this.link;
   },
 
   /** @private */
-  init: function() {
-    var nodes = this.nodes(),
-        orient = this.orient(),
-        w = this.parent.width(),
-        h = this.parent.height(),
-        r = Math.min(w, h) / 2,
-        ds = -nodes[0].minDepth;
+  buildImplied: function(s) {
+    var nodes = s.nodes,
+        orient = s.orient,
+        horizontal = /^(top|bottom)$/.test(orient),
+        w = s.width,
+        h = s.height,
+        depth = -nodes[0].minDepth;
+
+    /* Compute default inner and outer radius. */
+    if (orient == "radial") {
+      var ir = s.innerRadius, or = s.outerRadius;
+      if (ir == null) ir = 0;
+      if (ir) depth *= 2; // use full depth step for root
+      if (or == null) or = Math.min(w, h) / 2;
+    }
 
     /** @private Scales the specified depth for a space-filling layout. */
-    function scale(d, ds) {
-      return (d + ds) / (1 + ds);
+    function scale(d, depth) {
+      return (d + depth) / (1 + depth);
     }
 
     /** @private */
     function x(n) {
       switch (orient) {
-        case "left": return scale(n.minDepth, ds) * w;
-        case "right": return (1 - scale(n.maxDepth, ds)) * w;
+        case "left": return scale(n.minDepth, depth) * w;
+        case "right": return (1 - scale(n.maxDepth, depth)) * w;
         case "top": return n.minBreadth * w;
         case "bottom": return (1 - n.maxBreadth) * w;
         case "radial": return w / 2;
@@ -90,8 +181,8 @@ pv.Layout.Hierarchy.Fill = {
       switch (orient) {
         case "left": return n.minBreadth * h;
         case "right": return (1 - n.maxBreadth) * h;
-        case "top": return scale(n.minDepth, ds) * h;
-        case "bottom": return (1 - scale(n.maxDepth, ds)) * h;
+        case "top": return scale(n.minDepth, depth) * h;
+        case "bottom": return (1 - scale(n.maxDepth, depth)) * h;
         case "radial": return h / 2;
       }
     }
@@ -100,9 +191,10 @@ pv.Layout.Hierarchy.Fill = {
     function dx(n) {
       switch (orient) {
         case "left":
-        case "right": return (n.maxDepth - n.minDepth) / (1 + ds) * w;
+        case "right": return (n.maxDepth - n.minDepth) / (1 + depth) * w;
         case "top":
         case "bottom": return (n.maxBreadth - n.minBreadth) * w;
+        case "radial": return n.parentNode ? (n.innerRadius + n.outerRadius) * Math.cos(n.midAngle) : 0;
       }
     }
 
@@ -112,18 +204,19 @@ pv.Layout.Hierarchy.Fill = {
         case "left":
         case "right": return (n.maxBreadth - n.minBreadth) * h;
         case "top":
-        case "bottom": return (n.maxDepth - n.minDepth) / (1 + ds) * h;
+        case "bottom": return (n.maxDepth - n.minDepth) / (1 + depth) * h;
+        case "radial": return n.parentNode ? (n.innerRadius + n.outerRadius) * Math.sin(n.midAngle) : 0;
       }
     }
 
     /** @private */
     function innerRadius(n) {
-      return Math.max(0, scale(n.minDepth, ds / 2)) * r;
+      return Math.max(0, scale(n.minDepth, depth / 2)) * (or - ir) + ir;
     }
 
     /** @private */
     function outerRadius(n) {
-      return scale(n.maxDepth, ds / 2) * r;
+      return scale(n.maxDepth, depth / 2) * (or - ir) + ir;
     }
 
     /** @private */
@@ -140,12 +233,17 @@ pv.Layout.Hierarchy.Fill = {
       var n = nodes[i];
       n.x = x(n);
       n.y = y(n);
+      if (orient == "radial") {
+        n.innerRadius = innerRadius(n);
+        n.outerRadius = outerRadius(n);
+        n.startAngle = startAngle(n);
+        n.angle = angle(n);
+        n.midAngle = n.startAngle + n.angle / 2;
+      } else {
+        n.midAngle = horizontal ? -Math.PI / 2 : 0;
+      }
       n.dx = dx(n);
       n.dy = dy(n);
-      n.innerRadius = innerRadius(n);
-      n.outerRadius = outerRadius(n);
-      n.startAngle = startAngle(n);
-      n.angle = angle(n);
     }
   }
 };

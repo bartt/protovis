@@ -1,8 +1,33 @@
-// TODO code-sharing between scales
-
 /**
- * @ignore
- * @class
+ * Abstract; see the various scale implementations.
+ *
+ * @class Represents a scale; a function that performs a transformation from
+ * data domain to visual range. For quantitative and quantile scales, the domain
+ * is expressed as numbers; for ordinal scales, the domain is expressed as
+ * strings (or equivalently objects with unique string representations). The
+ * "visual range" may correspond to pixel space, colors, font sizes, and the
+ * like.
+ *
+ * <p>Note that scales are functions, and thus can be used as properties
+ * directly, assuming that the data associated with a mark is a number. While
+ * this is convenient for single-use scales, frequently it is desirable to
+ * define scales globally:
+ *
+ * <pre>var y = pv.Scale.linear(0, 100).range(0, 640);</pre>
+ *
+ * The <tt>y</tt> scale can now be equivalently referenced within a property:
+ *
+ * <pre>    .height(function(d) y(d))</pre>
+ *
+ * Alternatively, if the data are not simple numbers, the appropriate value can
+ * be passed to the <tt>y</tt> scale (e.g., <tt>d.foo</tt>). The {@link #by}
+ * method similarly allows the data to be mapped to a numeric value before
+ * performing the linear transformation.
+ *
+ * @see pv.Scale.quantitative
+ * @see pv.Scale.quantile
+ * @see pv.Scale.ordinal
+ * @extends function
  */
 pv.Scale = function() {};
 
@@ -34,3 +59,28 @@ pv.Scale.interpolator = function(start, end) {
             Math.round(start.b * (1 - t) + end.b * t), a));
   };
 };
+
+/**
+ * Returns a view of this scale by the specified accessor function <tt>f</tt>.
+ * Given a scale <tt>y</tt>, <tt>y.by(function(d) d.foo)</tt> is equivalent to
+ * <tt>function(d) y(d.foo)</tt>.
+ *
+ * <p>This method is provided for convenience, such that scales can be
+ * succinctly defined inline. For example, given an array of data elements that
+ * have a <tt>score</tt> attribute with the domain [0, 1], the height property
+ * could be specified as:
+ *
+ * <pre>    .height(pv.Scale.linear().range(0, 480).by(function(d) d.score))</pre>
+ *
+ * This is equivalent to:
+ *
+ * <pre>    .height(function(d) d.score * 480)</pre>
+ *
+ * This method should be used judiciously; it is typically more clear to invoke
+ * the scale directly, passing in the value to be scaled.
+ *
+ * @function
+ * @name pv.Scale.prototype.by
+ * @param {function} f an accessor function.
+ * @returns {pv.Scale} a view of this scale by the specified accessor function.
+ */

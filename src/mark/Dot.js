@@ -40,14 +40,24 @@ pv.Dot.prototype.type = "dot";
  */
 
 /**
+ * The radius of the dot, in pixels. This is an alternative to using
+ * {@link #size}.
+ *
+ * @see #size
+ * @type number
+ * @name pv.Dot.prototype.radius
+ */
+
+/**
  * The shape name. Several shapes are supported:<ul>
  *
  * <li>cross
  * <li>triangle
  * <li>diamond
  * <li>square
- * <li>tick
  * <li>circle
+ * <li>tick
+ * <li>bar
  *
  * </ul>These shapes can be further changed using the {@link #angle} property;
  * for instance, a cross can be turned into a plus by rotating. Similarly, the
@@ -135,34 +145,37 @@ pv.Dot.prototype.defaults = new pv.Dot()
  * @returns {pv.Anchor}
  */
 pv.Dot.prototype.anchor = function(name) {
-  var target = this;
+  var scene;
   return pv.Mark.prototype.anchor.call(this, name)
+    .def("$wedge.anchor", function() {
+        scene = this.scene.target;
+      })
     .left(function() {
-        var s = target.instance();
+        var s = scene[this.index];
         switch (this.name()) {
           case "bottom":
           case "top":
           case "center": return s.left;
-          case "right": return s.left + s.radius;
+          case "left": return null;
         }
-        return null;
+        return s.left + s.radius;
       })
     .right(function() {
-        var s = target.instance();
+        var s = scene[this.index];
         return this.name() == "left" ? s.right + s.radius : null;
       })
     .top(function() {
-        var s = target.instance();
+        var s = scene[this.index];
         switch (this.name()) {
           case "left":
           case "right":
           case "center": return s.top;
-          case "bottom": return s.top + s.radius;
+          case "top": return null;
         }
-        return null;
+        return s.top + s.radius;
       })
     .bottom(function() {
-        var s = target.instance();
+        var s = scene[this.index];
         return this.name() == "top" ? s.bottom + s.radius : null;
       })
     .textAlign(function() {

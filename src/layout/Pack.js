@@ -1,26 +1,91 @@
+/**
+ * Constructs a new, empty circle-packing layout. Layouts are not typically
+ * constructed directly; instead, they are added to an existing panel via
+ * {@link pv.Mark#add}.
+ *
+ * @class Implements a hierarchical layout using circle-packing. The meaning of
+ * the exported mark prototypes changes slightly in the space-filling
+ * implementation:<ul>
+ *
+ * <li><tt>node</tt> - for rendering nodes; typically a {@link pv.Dot}.
+ *
+ * <p><li><tt>link</tt> - unsupported; undefined. Links are encoded implicitly
+ * in the arrangement of the space-filling nodes.
+ *
+ * <p><li><tt>label</tt> - for rendering node labels; typically a
+ * {@link pv.Label}.
+ *
+ * </ul>The pack layout support dynamic sizing for leaf nodes, if a
+ * {@link #size} psuedo-property is specified. The default size function returns
+ * 1, causing all leaf nodes to be sized equally, and all internal nodes to be
+ * sized by the number of leaf nodes they have as descendants.
+ *
+ * <p>The size function can be used in conjunction with the order property,
+ * which allows the nodes to the sorted by the computed size. Note: for sorting
+ * based on other data attributes, simply use the default <tt>null</tt> for the
+ * order property, and sort the nodes beforehand using the {@link pv.Dom}
+ * operator.
+ *
+ * <p>For more details on how to use this layout, see
+ * {@link pv.Layout.Hierarchy}.
+ *
+ * @extends pv.Layout.Hierarchy
+ * @see <a href="http://portal.acm.org/citation.cfm?id=1124772.1124851"
+ * >"Visualization of large hierarchical data by circle packing"</a> by W. Wang,
+ * H. Wang, G. Dai, and H. Wang, ACM CHI 2006.
+ */
 pv.Layout.Pack = function() {
   pv.Layout.Hierarchy.call(this);
 
-  var node = this.node
+  this.node
       .radius(function(n) { return n.radius; })
       .strokeStyle("rgb(31, 119, 180)")
       .fillStyle("rgba(31, 119, 180, .25)");
 
-  /** @private Adding to this layout implicitly adds to this node. */
-  this.add = function(type) { return this.parent.add(type).extend(node); };
+  this.label
+      .textAlign("center");
 
-  /* Now hide references to inherited marks. */
-  delete this.node;
-  delete this.label;
+  /* Hide unsupported link. */
   delete this.link;
 };
 
 pv.Layout.Pack.prototype = pv.extend(pv.Layout.Hierarchy)
-    .property("spacing", Number);
+    .property("spacing", Number)
+    .property("order", String); // ascending, descending, reverse, null
 
+/**
+ * Default properties for circle-packing layouts. The default spacing parameter
+ * is 1 and the default order is "ascending".
+ *
+ * @type pv.Layout.Pack
+ */
 pv.Layout.Pack.prototype.defaults = new pv.Layout.Pack()
     .extend(pv.Layout.Hierarchy.prototype.defaults)
-    .spacing(1);
+    .spacing(1)
+    .order("ascending");
+
+/**
+ * The spacing parameter; defaults to 1, which provides a little bit of padding
+ * between sibling nodes and the enclosing circle. Larger values increase the
+ * spacing, by making the sibling nodes smaller; a value of zero makes the leaf
+ * nodes as large as possible, with no padding on enclosing circles.
+ *
+ * @type number
+ * @name pv.Layout.Pack.prototype.spacing
+ */
+
+/**
+ * The sibling node order. The default order is <tt>null</tt>, which means to
+ * use the sibling order specified by the nodes property as-is. A value of
+ * "ascending" will sort siblings in ascending order of size, while "descending"
+ * will do the reverse. For sorting based on data attributes other than size,
+ * use the default <tt>null</tt> for the order property, and sort the nodes
+ * beforehand using the {@link pv.Dom} operator.
+ *
+ * @see pv.Dom.Node#sort
+ * @type string
+ * @name pv.Layout.Pack.prototype.order
+ */
 
 /** @private The default size function. */
 pv.Layout.Pack.prototype.$radius = function() { return 1; };
@@ -37,7 +102,10 @@ pv.Layout.Pack.prototype.$radius = function() { return 1; };
  * files as leaf nodes, and each file has a <tt>bytes</tt> attribute, you can
  * specify a size function as:
  *
- * <pre>.size(function(d) d.bytes)</pre>
+ * <pre>    .size(function(d) d.bytes)</pre>
+ *
+ * As with other properties, a size function may specify additional arguments to
+ * access the data associated with the layout and any enclosing panels.
  *
  * @param {function} f the new sizing function.
  * @returns {pv.Layout.Pack} this.
@@ -50,9 +118,12 @@ pv.Layout.Pack.prototype.size = function(f) {
 };
 
 /** @private */
-pv.Layout.Pack.prototype.init = function() {
-  if (pv.Layout.Hierarchy.prototype.init.call(this)) return;
-  var that = this, spacing;
+pv.Layout.Pack.prototype.buildImplied = function(s) {
+  if (pv.Layout.Hierarchy.prototype.buildImplied.call(this, s)) return;
+
+  var that = this,
+      nodes = s.nodes,
+      root = nodes[0];
 
   /** @private Compute the radii of the leaf nodes. */
   function radii(nodes) {
@@ -61,8 +132,7 @@ pv.Layout.Pack.prototype.init = function() {
     for (var i = 0, n = nodes.length; i < n; i++) {
       var c = nodes[i];
       if (!c.firstChild) {
-        stack[0] = c.nodeValue;
-        c.radius = that.$radius.apply(that, stack);
+        c.radius = that.$radius.apply(that, (stack[0] = c, stack));
       }
     }
     stack.shift();
@@ -76,7 +146,20 @@ pv.Layout.Pack.prototype.init = function() {
       c.n = c.p = c;
       nodes.push(c);
     }
-    nodes.sort(function(a, b) { return a.radius - b.radius; });
+
+    /* Sort. */
+    switch (s.order) {
+      case "ascending": {
+        nodes.sort(function(a, b) { return a.radius - b.radius; });
+        break;
+      }
+      case "descending": {
+        nodes.sort(function(a, b) { return b.radius - a.radius; });
+        break;
+      }
+      case "reverse": nodes.reverse(); break;
+    }
+
     return packCircle(nodes);
   }
 
@@ -194,7 +277,7 @@ pv.Layout.Pack.prototype.init = function() {
       n.y -= cy;
       cr = Math.max(cr, n.radius + Math.sqrt(n.x * n.x + n.y * n.y));
     }
-    return cr + spacing;
+    return cr + s.spacing;
   }
 
   /** @private */
@@ -226,17 +309,15 @@ pv.Layout.Pack.prototype.init = function() {
     n.radius *= k;
   }
 
-  var nodes = this.nodes();
-  spacing = this.spacing();
   radii(nodes);
 
-  var root = nodes[0];
+  /* Recursively compute the layout. */
   root.x = 0;
   root.y = 0;
   root.radius = packTree(root);
 
-  var w = this.parent.width(),
-      h = this.parent.height(),
+  var w = this.width(),
+      h = this.height(),
       k = 1 / Math.max(2 * root.radius / w, 2 * root.radius / h);
   transform(root, w / 2, h / 2, k);
 };

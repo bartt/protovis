@@ -1,6 +1,9 @@
 /**
- * The format string is in the same format expected by the <tt>strftime</tt>
- * function in C. The following conversion specifications are supported:<ul>
+ * Constructs a new date format with the specified string pattern.
+ *
+ * @class The format string is in the same format expected by the
+ * <tt>strftime</tt> function in C. The following conversion specifications are
+ * supported:<ul>
  *
  * <li>%a - abbreviated weekday name.</li>
  * <li>%A - full weekday name.</li>
@@ -66,16 +69,13 @@
  * @see <a
  * href="http://www.opengroup.org/onlinepubs/007908799/xsh/strptime.html">strptime</a>
  * documentation.
+ * @extends pv.Format
+ * @param {string} pattern the format pattern.
  */
 pv.Format.date = function(pattern) {
   var pad = pv.Format.pad;
 
-  /**
-   * Converts a date to a string using the associated formatting pattern.
-   *
-   * @param {Date} date a date to format.
-   * @returns {string} the formatted date as a string.
-   */
+  /** @private */
   function format(d) {
     return pattern.replace(/%[a-zA-Z0-9]/g, function(s) {
         switch (s) {
@@ -144,10 +144,21 @@ pv.Format.date = function(pattern) {
   }
 
   /**
+   * Converts a date to a string using the associated formatting pattern.
+   *
+   * @function
+   * @name pv.Format.date.prototype.format
+   * @param {Date} date a date to format.
+   * @returns {string} the formatted date as a string.
+   */
+  format.format = format;
+
+  /**
    * Parses a date from a string using the associated formatting pattern.
    *
+   * @function
+   * @name pv.Format.date.prototype.parse
    * @param {string} s the string to parse as a date.
-   * @param {string} [format] an optional format string.
    * @returns {Date} the parsed date.
    */
   format.parse = function(s) {

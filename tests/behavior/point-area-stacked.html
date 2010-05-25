@@ -22,17 +22,16 @@ var vis = new pv.Panel()
     .height(h)
     .bottom(20)
     .left(20)
-    .right(10)
+    .right(30)
     .top(5)
-    .strokeStyle("#ccc")
     .events("all")
     .event("mousemove", pv.Behavior.point(Infinity).collapse("y"));
 
 var area = vis.add(pv.Layout.Stack)
-    .data(data)
-  .add(pv.Area)
-    .left(function(d) x(d.x))
-    .height(function(d) y(d.y));
+    .layers(data)
+    .x(function(d) x(d.x))
+    .y(function(d) y(d.y))
+  .layer.add(pv.Area);
 
 /* A transparent overlay to avoid label clipping. */
 vis.add(pv.Panel)
@@ -42,16 +41,19 @@ vis.add(pv.Panel)
     .fillStyle(null)
     .event("point", function() (i = this.index, this.parent))
     .event("unpoint", function() (i = -1, this.parent))
-  .anchor("top").add(pv.Dot)
+  .add(pv.Rule)
     .visible(function() i == this.index)
     .strokeStyle("black")
+  .anchor("top").add(pv.Rule)
+    .width(6)
+    .anchorTarget()
   .anchor("right").add(pv.Label)
     .text(function(d) d.y.toFixed(3));
 
 vis.add(pv.Rule)
     .data(x.ticks())
-    .visible(function(d) d > 0)
-    .left(function(d) Math.round(x(d)) - .5)
+    .visible(function(d) d)
+    .left(x)
     .strokeStyle("rgba(128,128,128,.1)")
   .anchor("bottom").add(pv.Label)
     .text(function(d) d.toFixed());
@@ -59,8 +61,8 @@ vis.add(pv.Rule)
 vis.add(pv.Rule)
     .data(y.ticks())
     .visible(function() !(this.index % 2))
-    .bottom(function(d) Math.round(y(d)) - .5)
-    .strokeStyle("rgba(128,128,128,.2)")
+    .bottom(y)
+    .strokeStyle(function(d) d ? "rgba(128,128,128,.2)" : "#000")
   .anchor("left").add(pv.Label)
     .text(function(d) d.toFixed());
 

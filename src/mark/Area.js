@@ -26,11 +26,12 @@ pv.Area = function() {
 pv.Area.prototype = pv.extend(pv.Mark)
     .property("width", Number)
     .property("height", Number)
-    .property("lineWidth", String)
+    .property("lineWidth", Number)
     .property("strokeStyle", pv.color)
     .property("fillStyle", pv.color)
     .property("segmented", Boolean)
-    .property("interpolate", String);
+    .property("interpolate", String)
+    .property("tension", Number);
 
 pv.Area.prototype.type = "area";
 
@@ -110,12 +111,27 @@ pv.Area.prototype.type = "area";
  * How to interpolate between values. Linear interpolation ("linear") is the
  * default, producing a straight line between points. For piecewise constant
  * functions (i.e., step functions), either "step-before" or "step-after" can be
- * specified.
+ * specified. To draw open uniform b-splines, specify "basis". To draw cardinal
+ * splines, specify "cardinal"; see also {@link #tension}.
  *
  * <p>This property is <i>fixed</i>. See {@link pv.Mark}.
  *
  * @type string
  * @name pv.Area.prototype.interpolate
+ */
+
+/**
+ * The tension of cardinal splines; used in conjunction with
+ * interpolate("cardinal"). A value between 0 and 1 draws cardinal splines with
+ * the given tension. In some sense, the tension can be interpreted as the
+ * "length" of the tangent; a tension of 1 will yield all zero tangents (i.e.,
+ * linear interpolation), and a tension of 0 yields a Catmull-Rom spline. The
+ * default value is 0.7.
+ *
+ * <p>This property is <i>fixed</i>. See {@link pv.Mark}.
+ *
+ * @type number
+ * @name pv.Area.prototype.tension
  */
 
 /**
@@ -128,7 +144,8 @@ pv.Area.prototype.defaults = new pv.Area()
     .extend(pv.Mark.prototype.defaults)
     .lineWidth(1.5)
     .fillStyle(pv.Colors.category20().by(pv.parent))
-    .interpolate("linear");
+    .interpolate("linear")
+    .tension(.7);
 
 /** @private Sets width and height to zero if null. */
 pv.Area.prototype.buildImplied = function(s) {
@@ -140,10 +157,12 @@ pv.Area.prototype.buildImplied = function(s) {
 /** @private Records which properties may be fixed. */
 pv.Area.fixed = {
   lineWidth: 1,
+  lineJoin: 1,
   strokeStyle: 1,
   fillStyle: 1,
   segmented: 1,
-  interpolate: 1
+  interpolate: 1,
+  tension: 1
 };
 
 /**
@@ -209,4 +228,44 @@ pv.Area.prototype.buildInstance = function(s) {
   }
 
   pv.Mark.prototype.buildInstance.call(this, s);
+};
+
+/**
+ * Constructs a new area anchor with default properties. Areas support five
+ * different anchors:<ul>
+ *
+ * <li>top
+ * <li>left
+ * <li>center
+ * <li>bottom
+ * <li>right
+ *
+ * </ul>In addition to positioning properties (left, right, top bottom), the
+ * anchors support text rendering properties (text-align, text-baseline). Text
+ * is rendered to appear inside the area. The area anchor also propagates the
+ * interpolate, eccentricity, and tension properties such that an anchored area
+ * or line will match positions between control points.
+ *
+ * <p>For consistency with the other mark types, the anchor positions are
+ * defined in terms of their opposite edge. For example, the top anchor defines
+ * the bottom property, such that an area added to the top anchor grows upward.
+ *
+ * @param {string} name the anchor name; either a string or a property function.
+ * @returns {pv.Anchor}
+ */
+pv.Area.prototype.anchor = function(name) {
+  var scene;
+  return pv.Mark.prototype.anchor.call(this, name)
+    .def("$area.anchor", function() {
+        scene = this.scene.target;
+      })
+    .interpolate(function() {
+       return scene[this.index].interpolate;
+      })
+    .eccentricity(function() {
+       return scene[this.index].eccentricity;
+      })
+    .tension(function() {
+        return scene[this.index].tension;
+      });
 };

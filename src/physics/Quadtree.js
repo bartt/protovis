@@ -1,8 +1,18 @@
 /**
- * A quadtree.
+ * Constructs a new quadtree for the specified array of particles.
  *
- * @constructor Constructs a new quadtree for the specified array of particles.
+ * @class Represents a quadtree: a two-dimensional recursive spatial
+ * subdivision. This particular implementation uses square partitions, dividing
+ * each square into four equally-sized squares. Each particle exists in a unique
+ * node; if multiple particles are in the same position, some particles may be
+ * stored on internal nodes rather than leaf nodes.
  *
+ * <p>This quadtree can be used to accelerate various spatial operations, such
+ * as the Barnes-Hut approximation for computing n-body forces, or collision
+ * detection.
+ *
+ * @see pv.Force.charge
+ * @see pv.Constraint.collision
  * @param {pv.Particle} particles the linked list of particles.
  */
 pv.Quadtree = function(particles) {
@@ -28,11 +38,12 @@ pv.Quadtree = function(particles) {
   this.yMax = y2;
 
   /**
-   * Recursively inserts the specified particle <i>p</i> at the node <i>n</i> or
-   * one of its descendants. The bounds are defined by [<i>x1</i>, <i>x2</i>]
-   * and [<i>y1</i>, <i>y2</i>].
+   * @ignore Recursively inserts the specified particle <i>p</i> at the node
+   * <i>n</i> or one of its descendants. The bounds are defined by [<i>x1</i>,
+   * <i>x2</i>] and [<i>y1</i>, <i>y2</i>].
    */
   function insert(n, p, x1, y1, x2, y2) {
+    if (isNaN(p.x) || isNaN(p.y)) return; // ignore invalid particles
     if (n.leaf) {
       if (n.p) {
         /*
@@ -58,9 +69,9 @@ pv.Quadtree = function(particles) {
   }
 
   /**
-   * Recursively inserts the specified particle <i>p</i> into a descendant of
-   * node <i>n</i>. The bounds are defined by [<i>x1</i>, <i>x2</i>] and
-   * [<i>y1</i>, <i>y2</i>].
+   * @ignore Recursively inserts the specified particle <i>p</i> into a
+   * descendant of node <i>n</i>. The bounds are defined by [<i>x1</i>,
+   * <i>x2</i>] and [<i>y1</i>, <i>y2</i>].
    */
   function insertChild(n, p, x1, y1, x2, y2) {
     /* Compute the split point, and the quadrant in which to insert p. */
@@ -90,34 +101,46 @@ pv.Quadtree = function(particles) {
 };
 
 /**
- * @type pv.Quadtree.Node
- * @field pv.Quadtree.prototype.root
- */
-
-/**
- * @type number
- * @field pv.Quadtree.prototype.xMin
- */
-
-/**
- * @type number
- * @field pv.Quadtree.prototype.xMax
- */
-
-/**
- * @type number
- * @field pv.Quadtree.prototype.yMin
- */
-
-/**
- * @type number
- * @field pv.Quadtree.prototype.yMax
- */
-
-/**
- * A node in a quadtree.
+ * The root node of the quadtree.
  *
- * @constructor Constructs a new node.
+ * @type pv.Quadtree.Node
+ * @name pv.Quadtree.prototype.root
+ */
+
+/**
+ * The minimum x-coordinate value of all contained particles.
+ *
+ * @type number
+ * @name pv.Quadtree.prototype.xMin
+ */
+
+/**
+ * The maximum x-coordinate value of all contained particles.
+ *
+ * @type number
+ * @name pv.Quadtree.prototype.xMax
+ */
+
+/**
+ * The minimum y-coordinate value of all contained particles.
+ *
+ * @type number
+ * @name pv.Quadtree.prototype.yMin
+ */
+
+/**
+ * The maximum y-coordinate value of all contained particles.
+ *
+ * @type number
+ * @name pv.Quadtree.prototype.yMax
+ */
+
+/**
+ * Constructs a new node.
+ *
+ * @class A node in a quadtree.
+ *
+ * @see pv.Quadtree
  */
 pv.Quadtree.Node = function() {
   /*
@@ -126,7 +149,6 @@ pv.Quadtree.Node = function() {
    * faster than creating a cache pool.
    */
   this.leaf = true;
-  this.next = null;
   this.c1 = null;
   this.c2 = null;
   this.c3 = null;
@@ -141,38 +163,33 @@ pv.Quadtree.Node = function() {
  * {@link #c3} or {@link #c4} is guaranteed to be non-null.
  *
  * @type boolean
- * @field pv.Quadtree.Node.prototype.leaf
- */
-
-/**
- * @type pv.Quadtree.Node
- * @field pv.Quadtree.Node.prototype.next
+ * @name pv.Quadtree.Node.prototype.leaf
  */
 
 /**
  * The particle associated with this node, if any.
  *
  * @type pv.Particle
- * @field pv.Quadtree.Node.prototype.p
+ * @name pv.Quadtree.Node.prototype.p
  */
 
 /**
  * The child node for the second quadrant, if any.
  *
  * @type pv.Quadtree.Node
- * @field pv.Quadtree.Node.prototype.c2
+ * @name pv.Quadtree.Node.prototype.c2
  */
 
 /**
  * The child node for the third quadrant, if any.
  *
  * @type pv.Quadtree.Node
- * @field pv.Quadtree.Node.prototype.c3
+ * @name pv.Quadtree.Node.prototype.c3
  */
 
 /**
  * The child node for the fourth quadrant, if any.
  *
  * @type pv.Quadtree.Node
- * @field pv.Quadtree.Node.prototype.c4
+ * @name pv.Quadtree.Node.prototype.c4
  */

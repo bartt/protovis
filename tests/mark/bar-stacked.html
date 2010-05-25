@@ -24,12 +24,12 @@ var vis = new pv.Panel()
     .top(5);
 
 var bar = vis.add(pv.Layout.Stack)
-    .data(data)
-    .orient("left")
-  .add(pv.Bar)
-    .top(function() y(this.index))
-    .height(y.range().band)
-    .width(x);
+    .layers(data)
+    .orient("left-top")
+    .x(function() y(this.index))
+    .y(x)
+  .layer.add(pv.Bar)
+    .height(y.range().band);
 
 bar.anchor("right").add(pv.Label)
     .visible(function(d) d > .2)
@@ -44,7 +44,7 @@ bar.anchor("left").add(pv.Label)
 
 vis.add(pv.Rule)
     .data(x.ticks())
-    .left(function(d) Math.round(x(d)) - .5)
+    .left(x)
     .strokeStyle(function(d) d ? "rgba(255,255,255,.3)" : "#000")
   .add(pv.Rule)
     .bottom(0)

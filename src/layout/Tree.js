@@ -1,4 +1,26 @@
-/** @see http://citeseer.ist.psu.edu/buchheim02improving.html */
+/**
+ * Constructs a new, empty tree layout. Layouts are not typically constructed
+ * directly; instead, they are added to an existing panel via
+ * {@link pv.Mark#add}.
+ *
+ * @class Implements a node-link tree diagram using the Reingold-Tilford "tidy"
+ * tree layout algorithm. The specific algorithm used by this layout is based on
+ * <a href="http://citeseer.ist.psu.edu/buchheim02improving.html">"Improving
+ * Walker's Algorithm to Run in Linear Time"</A> by C. Buchheim, M. J&uuml;nger
+ * &amp; S. Leipert, Graph Drawing 2002. This layout supports both cartesian and
+ * radial orientations orientations for node-link diagrams.
+ *
+ * <p>The tree layout supports a "group" property, which if true causes siblings
+ * to be positioned closer together than unrelated nodes at the same depth. The
+ * layout can be configured using the <tt>depth</tt> and <tt>breadth</tt>
+ * properties, which control the increments in pixel space between nodes in both
+ * dimensions, similar to the indent layout.
+ *
+ * <p>For more details on how to use this layout, see
+ * {@link pv.Layout.Hierarchy}.
+ *
+ * @extends pv.Layout.Hierarchy
+ */
 pv.Layout.Tree = function() {
   pv.Layout.Hierarchy.call(this);
 };
@@ -9,6 +31,13 @@ pv.Layout.Tree.prototype = pv.extend(pv.Layout.Hierarchy)
     .property("depth", Number)
     .property("orient", String);
 
+/**
+ * Default properties for tree layouts. The default orientation is "top", the
+ * default group parameter is 1, and the default breadth and depth offsets are
+ * 15 and 60 respectively.
+ *
+ * @type pv.Layout.Tree
+ */
 pv.Layout.Tree.prototype.defaults = new pv.Layout.Tree()
     .extend(pv.Layout.Hierarchy.prototype.defaults)
     .group(1)
@@ -16,15 +45,17 @@ pv.Layout.Tree.prototype.defaults = new pv.Layout.Tree()
     .depth(60)
     .orient("top");
 
-pv.Layout.Tree.prototype.init = function() {
-  if (pv.Layout.Hierarchy.prototype.init.call(this)) return;
-  var nodes = this.nodes(),
-      orient = this.orient(),
-      depth = this.depth(),
-      breadth = this.breadth(),
-      group = this.group(),
-      w = this.parent.width(),
-      h = this.parent.height();
+/** @private */
+pv.Layout.Tree.prototype.buildImplied = function(s) {
+  if (pv.Layout.Hierarchy.prototype.buildImplied.call(this, s)) return;
+
+  var nodes = s.nodes,
+      orient = s.orient,
+      depth = s.depth,
+      breadth = s.breadth,
+      group = s.group,
+      w = s.width,
+      h = s.height;
 
   /** @private */
   function firstWalk(v) {
@@ -165,10 +196,8 @@ pv.Layout.Tree.prototype.init = function() {
   secondWalk(root, -root.prelim, 0);
 
   /** @private Returns the angle of the given node. */
-  function angle(n) {
-    return (orient == "radial")
-        ? n.breadth / depth
-        : (n.firstChild ? Math.PI : 0);
+  function midAngle(n) {
+    return (orient == "radial") ? n.breadth / depth : 0;
   }
 
   /** @private */
@@ -178,7 +207,7 @@ pv.Layout.Tree.prototype.init = function() {
       case "right": return w - n.depth;
       case "top":
       case "bottom": return n.breadth + w / 2;
-      case "radial": return w / 2 + n.depth * Math.cos(angle(n));
+      case "radial": return w / 2 + n.depth * Math.cos(midAngle(n));
     }
   }
 
@@ -189,7 +218,7 @@ pv.Layout.Tree.prototype.init = function() {
       case "right": return n.breadth + h / 2;
       case "top": return n.depth;
       case "bottom": return h - n.depth;
-      case "radial": return h / 2 + n.depth * Math.sin(angle(n));
+      case "radial": return h / 2 + n.depth * Math.sin(midAngle(n));
     }
   }
 
@@ -197,9 +226,10 @@ pv.Layout.Tree.prototype.init = function() {
   root.visitAfter(function(v) {
       v.breadth *= breadth;
       v.depth *= depth;
-      v.angle = angle(v);
+      v.midAngle = midAngle(v);
       v.x = x(v);
       v.y = y(v);
+      if (v.firstChild) v.midAngle += Math.PI;
       delete v.breadth;
       delete v.depth;
       delete v.ancestor;
@@ -213,9 +243,23 @@ pv.Layout.Tree.prototype.init = function() {
 };
 
 /**
- * The orientation. The default orientation is "left", which means that the root
- * node is placed on the left edge, leaf nodes appear on the right edge, and
- * internal nodes are in-between. The following orientations are supported:<ul>
+ * The offset between siblings nodes; defaults to 15.
+ *
+ * @type number
+ * @name pv.Layout.Tree.prototype.breadth
+ */
+
+/**
+ * The offset between parent and child nodes; defaults to 60.
+ *
+ * @type number
+ * @name pv.Layout.Tree.prototype.depth
+ */
+
+/**
+ * The orientation. The default orientation is "top", which means that the root
+ * node is placed on the top edge, leaf nodes appear at the bottom, and internal
+ * nodes are in-between. The following orientations are supported:<ul>
  *
  * <li>left - left-to-right.
  * <li>right - right-to-left.
@@ -223,10 +267,8 @@ pv.Layout.Tree.prototype.init = function() {
  * <li>bottom - bottom-to-top.
  * <li>radial - radially, with the root at the center.</ul>
  *
- * @param {string} v the new orientation.
- * @function
+ * @type string
  * @name pv.Layout.Tree.prototype.orient
- * @returns {pv.Layout.Tree} this, or the current orientation.
  */
 
 /**
@@ -235,8 +277,6 @@ pv.Layout.Tree.prototype.init = function() {
  * separated by one breadth offset. Setting this to false (or 0) causes
  * non-siblings to be adjacent.
  *
- * @param {number} x the new group spacing.
- * @function
+ * @type number
  * @name pv.Layout.Tree.prototype.group
- * @returns {pv.Layout.Tree} this, or the current group spacing.
  */

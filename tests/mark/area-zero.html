@@ -8,6 +8,7 @@
     <script type="text/javascript+protovis">
 
 var vis = new pv.Panel()
+    .data(["step-before", "linear", "step-after", "basis"])
     .width(400)
     .height(110);
 
@@ -17,6 +18,7 @@ vis.add(pv.Area)
     .bottom(10)
     .height(function(d) d * 20)
     .strokeStyle("rgba(0,0,0,.5)")
+    .interpolate(function(d, p) p)
     .lineWidth(10);
 
 vis.render();

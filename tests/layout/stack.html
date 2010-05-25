@@ -25,25 +25,29 @@ var vis = new pv.Panel()
     .width(w)
     .height(h);
 
-vis.add(pv.Layout.Stack)
-    .data(layers(n, m))
-    .orient("top")
+var area = vis.add(pv.Layout.Stack)
+    .layers(layers(n, m))
     .order("inside-out")
     .offset("wiggle")
+    .x(x.by(pv.index))
+    .y(y)
+  .layer.add(pv.Area)
+    .fillStyle(pv.ramp("#aad", "#556").by(Math.random));
+
+vis.add(pv.Panel)
+    .extend(area.parent)
   .add(pv.Area)
-    .left(x.by(pv.index))
-    .height(y)
-    .fillStyle(pv.ramp("#aad", "#556").by(Math.random))
-    .strokeStyle(function() this.fillStyle().alpha(.5))
-  .label.add(pv.Label)
-    .textStyle("white")
+    .extend(area)
+    .fillStyle(null)
+  .anchor("center").add(pv.Label)
+    .def("max", function(d) pv.max.index(d))
+    .visible(function() this.index == this.max())
     .font(function(d) Math.max(10, d * 4) + "px sans-serif")
+    .textStyle("white")
     .text(pv.parent);
 
 vis.render();
 
-
     </script>
   </body>
 </html>
-

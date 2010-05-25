@@ -2,7 +2,6 @@
   <head>
     <title>Drag</title>
     <script type="text/javascript" src="../../protovis-d3.2.js"></script>
-    <link rel="stylesheet" type="text/css" href="../style.css"/>
   </head>
   <body>
     <script type="text/javascript+protovis">
@@ -13,7 +12,7 @@ var w = 400,
 var vis = new pv.Panel()
     .width(w)
     .height(h)
-    .margin(10)
+    .margin(12)
     .strokeStyle("#ccc")
     .fillStyle("#fff");
 
@@ -22,13 +21,11 @@ vis.add(pv.Dot)
     .left(function(d) d.x)
     .top(function(d) d.y)
     .radius(10)
-    .fillStyle("#aec7e8")
+    .fillStyle(function(d) d.fix ? "#ff7f0e" : "#aec7e8")
+    .cursor("move")
     .event("mousedown", pv.Behavior.drag());
 
 vis.render();
-
-/* Hack! Drag behavior should support re-rendering. */
-pv.listen(window, "mousemove", function() vis.render());
 
     </script>
   </body>

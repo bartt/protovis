@@ -17,7 +17,8 @@ vis.add(pv.Bar)
     .fillStyle("#ccc")
   .anchor("top").add(pv.Label)
     .text("top")
-  .anchorTarget().anchor("bottom").add(pv.Label)
+    .anchorTarget()
+  .anchor("bottom").add(pv.Label)
     .text("bottom");
 
 vis.render();

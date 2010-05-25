@@ -1,6 +1,3 @@
-// TODO fillStyle for lineSegment?
-// TODO lineOffset for flow maps?
-
 pv.SvgScene.line = function(scenes) {
   var e = scenes.$g.firstChild;
   if (scenes.length < 2) return e;
@@ -16,8 +13,17 @@ pv.SvgScene.line = function(scenes) {
 
   /* points */
   var d = "M" + s.left + "," + s.top;
-  for (var i = 1; i < scenes.length; i++) {
-    d += this.pathSegment(scenes[i - 1], scenes[i]);
+
+  if (scenes.length > 2 && (s.interpolate == "basis" || s.interpolate == "cardinal" || s.interpolate == "monotone")) {
+    switch (s.interpolate) {
+      case "basis": d += this.curveBasis(scenes); break;
+      case "cardinal": d += this.curveCardinal(scenes, s.tension); break;
+      case "monotone": d += this.curveMonotone(scenes); break;
+    }
+  } else {
+    for (var i = 1; i < scenes.length; i++) {
+      d += this.pathSegment(scenes[i - 1], scenes[i]);
+    }
   }
 
   e = this.expect(e, "path", {
@@ -29,13 +35,23 @@ pv.SvgScene.line = function(scenes) {
       "fill-opacity": fill.opacity || null,
       "stroke": stroke.color,
       "stroke-opacity": stroke.opacity || null,
-      "stroke-width": stroke.opacity ? s.lineWidth / this.scale : null
+      "stroke-width": stroke.opacity ? s.lineWidth / this.scale : null,
+      "stroke-linejoin": s.lineJoin
     });
   return this.append(e, scenes, 0);
 };
 
 pv.SvgScene.lineSegment = function(scenes) {
   var e = scenes.$g.firstChild;
+
+  var s = scenes[0];
+  var paths;
+  switch (s.interpolate) {
+    case "basis": paths = this.curveBasisSegments(scenes); break;
+    case "cardinal": paths = this.curveCardinalSegments(scenes, s.tension); break;
+    case "monotone": paths = this.curveMonotoneSegments(scenes); break;
+  }
+
   for (var i = 0, n = scenes.length - 1; i < n; i++) {
     var s1 = scenes[i], s2 = scenes[i + 1];
 
@@ -46,10 +62,12 @@ pv.SvgScene.lineSegment = function(scenes) {
 
     /* interpolate */
     var d;
-    if (s1.interpolate == "linear") {
+    if ((s1.interpolate == "linear") && (s1.lineJoin == "miter")) {
       fill = stroke;
       stroke = pv.Color.transparent;
       d = this.pathJoin(scenes[i - 1], s1, s2, scenes[i + 2]);
+    } else if(paths) {
+      d = paths[i];
     } else {
       d = "M" + s1.left + "," + s1.top + this.pathSegment(s1, s2);
     }
@@ -63,7 +81,8 @@ pv.SvgScene.lineSegment = function(scenes) {
         "fill-opacity": fill.opacity || null,
         "stroke": stroke.color,
         "stroke-opacity": stroke.opacity || null,
-        "stroke-width": stroke.opacity ? s1.lineWidth / this.scale : null
+        "stroke-width": stroke.opacity ? s1.lineWidth / this.scale : null,
+        "stroke-linejoin": s1.lineJoin
       });
     e = this.append(e, scenes, i);
   }
@@ -72,12 +91,17 @@ pv.SvgScene.lineSegment = function(scenes) {
 
 /** @private Returns the path segment for the specified points. */
 pv.SvgScene.pathSegment = function(s1, s2) {
+  var l = 1; // sweep-flag
   switch (s1.interpolate) {
+    case "polar-reverse":
+      l = 0;
     case "polar": {
       var dx = s2.left - s1.left,
           dy = s2.top - s1.top,
-          r = Math.sqrt(dx * dx + dy * dy) / 2;
-      return "A" + r + "," + r + " 0 1,1 " + s2.left + "," + s2.top;
+          e = 1 - s1.eccentricity,
+          r = Math.sqrt(dx * dx + dy * dy) / (2 * e);
+      if ((e <= 0) || (e > 1)) break; // draw a straight line
+      return "A" + r + "," + r + " 0 0," + l + " " + s2.left + "," + s2.top;
     }
     case "step-before": return "V" + s2.top + "H" + s2.left;
     case "step-after": return "H" + s2.left + "V" + s2.top;
@@ -129,7 +153,7 @@ pv.SvgScene.pathJoin = function(s0, s1, s2, s3) {
   }
 
   return "M" + a.x + "," + a.y
-      + "L" + b.x + "," + b.y
-      + " " + c.x + "," + c.y
-      + " " + d.x + "," + d.y;
+       + "L" + b.x + "," + b.y
+       + " " + c.x + "," + c.y
+       + " " + d.x + "," + d.y;
 };
