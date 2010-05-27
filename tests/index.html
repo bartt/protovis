@@ -68,6 +68,16 @@
             This can be alleviated by only re-rendering child marks on the
             graph, and longer term we can probably find some performance
             improvements for it.
+            <li> In SVGWeb, when nodes are rerendered, the re-render
+            can cause SVGWeb to trigger a mouseover event for the
+            newly renderer node. As many graphs re-render the same
+            node, changing color etc, this causes an infinite
+            stream of mouseover events.
+            <p> Therefore, be very careful on how you trigger color/graphical
+            changes on mouseover. Ensure you don't re-render if on mouseover you 
+            get the same index. Also, try and avoid having a mouseout event 
+            on the same mark as the mouseover - instead try and add mouseout to
+            your base panel, and mouseover to your mark (bar chart whatever).
             <li>The flash renderer doesn't seem to get circle's correct - 
             see the polar clock for an example. This also occurs in other
             situations - e.g. see the antibiotics example.
