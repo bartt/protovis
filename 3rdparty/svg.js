@@ -5855,9 +5855,10 @@ extend(_Element, {
       }
     }
     
-    if (!attrNode) {
-      console.log('No attribute node found for: ' + localName
-                  + ' in the namespace: ' + ns);
+    if (!attrNode) { 
+      // JL - remove this as it logs all the time when using protovis.
+      //console.log('No attribute node found for: ' + localName
+      //            + ' in the namespace: ' + ns);
       return;
     }
         
