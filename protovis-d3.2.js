@@ -1,4 +1,4 @@
-// 305b306f705dc55ea45e1b7c29909dd874a86a6b
+// 85ca1344bff0e8d51c1d49d5d00f71b1d632b18f
 /**
  * @class The built-in Array class.
  * @name Array
@@ -6112,13 +6112,9 @@ pv.SvgScene.panel = function(scenes) {
 
             g.addEventListener('SVGLoad', function() {
                 this.appendChild(frag);
-                this.addEventListener ('click', pv.SvgScene.dispatch, true);
-                this.addEventListener ('mousedown', pv.SvgScene.dispatch, true);
-                this.addEventListener ('mouseup', pv.SvgScene.dispatch, true);
-                this.addEventListener ('mouseout', pv.SvgScene.dispatch, true);
-                this.addEventListener ('mouseover', pv.SvgScene.dispatch, true);
-                this.addEventListener ('mousemove', pv.SvgScene.dispatch, true);
-                this.addEventListener ('mousewheel', pv.SvgScene.dispatch, true);
+                for (var j = 0; j < pv.Scene.events.length; j++) {
+                  this.addEventListener(pv.Scene.events[j], pv.SvgScene.dispatch, false);
+                }
                 scenes.$g = this;
             }, false);
 

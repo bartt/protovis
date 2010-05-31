@@ -30,13 +30,9 @@ pv.SvgScene.panel = function(scenes) {
 
             g.addEventListener('SVGLoad', function() {
                 this.appendChild(frag);
-                this.addEventListener ('click', pv.SvgScene.dispatch, true);
-                this.addEventListener ('mousedown', pv.SvgScene.dispatch, true);
-                this.addEventListener ('mouseup', pv.SvgScene.dispatch, true);
-                this.addEventListener ('mouseout', pv.SvgScene.dispatch, true);
-                this.addEventListener ('mouseover', pv.SvgScene.dispatch, true);
-                this.addEventListener ('mousemove', pv.SvgScene.dispatch, true);
-                this.addEventListener ('mousewheel', pv.SvgScene.dispatch, true);
+                for (var j = 0; j < pv.Scene.events.length; j++) {
+                  this.addEventListener(pv.Scene.events[j], pv.SvgScene.dispatch, false);
+                }
                 scenes.$g = this;
             }, false);
 
