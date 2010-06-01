@@ -1,4 +1,4 @@
-// 85ca1344bff0e8d51c1d49d5d00f71b1d632b18f
+// 6e29b5a9e69b8c7910feedf5f80d079fa3bfa36c
 /**
  * @class The built-in Array class.
  * @name Array
@@ -376,7 +376,7 @@ pv.listenForPageLoad = function(listener) {
     } else if ( document.attachEvent ) {
 
         // A fallback to window.onload, that will always work
-        window.attachEvent( "onload", listener );
+        window.attachEvent( "onsvgload", listener );
     }
 }
 

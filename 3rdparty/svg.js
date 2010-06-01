@@ -541,8 +541,12 @@ function parseXML(xml, preserveWhiteSpace) {
     }
   }
   
-  // cache parsed XML (Issue 421)
-  parseXMLCache[preserveWhiteSpace + xml] = xmlDoc.cloneNode(true);
+  // cache parsed XML to speed up performance (Issue 421)
+  try {
+    parseXMLCache[preserveWhiteSpace + xml] = xmlDoc.cloneNode(true);
+  } catch (e) {
+    // Opera at v10.10 cannot clone a Document
+  }
   
   return xmlDoc;
 }
@@ -667,8 +671,10 @@ function xhrObj() {
   }
 }
 
-// we just use an autoincrement counter to ensure uniqueness for our node 
-// tracking, which is fine for our situation and produces much smaller GUIDs
+// We just use an autoincrement counter to ensure uniqueness for our node 
+// tracking, which is fine for our situation and produces much smaller GUIDs;
+// GUIDs are used to track individual SVG nodes between our JavaScript and
+// Flash.
 var guidCounter = 0;
 function guid() {
   return '_' + guidCounter++;
@@ -767,6 +773,12 @@ extend(SVGWeb, {
     } else { // normal addOnLoad request from containing HTML page
       this._loadListeners.push(listener);
     }
+    
+    // fire the onsvgload event immediately if the page was done
+    // loading earlier
+    if (this.pageLoaded) {
+      this._fireOnLoad();
+    }
   },
   
   /** Returns a string for the given handler for this platform, 'flash' if
@@ -798,14 +810,15 @@ extend(SVGWeb, {
       this._svgObjects.push(node);
       
       if (this.getHandlerType() == 'native') {
+        node.onload = node.onsvgload;
         parent.appendChild(node);
       }
       
       var placeHolder = node;
       if (this.getHandlerType() == 'flash') {
         // register onloads
-        if (node.onload) {
-          node.addEventListener('load', node.onload, false);
+        if (node.onsvgload) {
+          node.addEventListener('SVGLoad', node.onsvgload, false);
         }
         
         // Turn our OBJECT into a place-holder DIV attached to the DOM, 
@@ -847,9 +860,9 @@ extend(SVGWeb, {
       // dynamic SVG root
       this.totalSVG++;
       
-      // copy over any node.onload listener
-      if (node.onload) {
-        node.addEventListener('SVGLoad', node.onload, false);
+      // copy over any node.onsvgload listener
+      if (node.onsvgload) {
+        node.addEventListener('SVGLoad', node.onsvgload, false);
       }
       
       if (isIE && node._fakeNode) {
@@ -1106,7 +1119,6 @@ extend(SVGWeb, {
     if (document.addEventListener) {
       // DOMContentLoaded natively supported on Opera 9/Mozilla/Safari 3
       document.addEventListener('DOMContentLoaded', function() {
-        self._saveWindowOnload();
         self._onDOMContentLoaded();
       }, false);
     } else { // Internet Explorer
@@ -1117,17 +1129,7 @@ extend(SVGWeb, {
                       + 'src=//0><\/script>');
       var script = document.getElementById('__ie__svg__onload');
       script.onreadystatechange = function() {
-        // Save any window.onload listener that might be registered so we can
-        // delay calling it until we are done internally. IE has two tricky
-        // states when it comes to this:
-        // * Page loaded from cache - window.onload will be ready during
-        // 'loaded' or 'loading' readyState event. If we wait until a
-        // 'complete' readyState for this kind it will be too late.
-        // * Page not in cache - we must use a document.onreadystatechange
-        // listener to detect an 'interactive' or 'complete' readyState event.
-        if (this.readyState != 'complete' && window.onload) {
-          self._saveWindowOnload();
-        } else if (this.readyState == 'complete') {
+        if (this.readyState == 'complete') {
           // all the DOM content is finished loading -- continue our internal
           // execution now
           self._onDOMContentLoaded();
@@ -1180,10 +1182,21 @@ extend(SVGWeb, {
   
   /** Gets any data-path value that might exist on the SCRIPT tag
       that pulls in our svg.js or svg-uncompressed.js library to configure 
-      where to find library resources like SWF files, HTC files, etc. */
+      where to find library resources like SWF files, HTC files, etc. 
+      You can also use a META tag with the name 'svg.config.data-path'
+      and the content property set to the data path. */
   _getLibraryPath: function() {
     // determine the path to our HTC and Flash files
     var libraryPath = './';
+    
+    var meta = document.getElementsByTagName('meta');
+    for (var i = 0; i < meta.length; i++) {
+      if (meta[i].name == 'svg.config.data-path'
+          && meta[i].content.length > 0) {
+        libraryPath = meta[i].content;
+      }
+    }
+    
     var scripts = document.getElementsByTagName('script');
     for (var i = 0; i < scripts.length; i++) {
       if (/svg(?:\-uncompressed)?\.js/.test(scripts[i].src)
@@ -1256,6 +1269,9 @@ extend(SVGWeb, {
       listener.onreadystatechange = null;
       listener = null;
     }
+    
+    // save any window.onsvgload listener that might be present
+    this._saveWindowOnload();
     
     // determine what renderers (native or Flash) to use for which browsers
     this.config = new RenderConfig();
@@ -1562,18 +1578,11 @@ extend(SVGWeb, {
         svg = '<?xml version="1.0"?>\n' + svg;
       }
       
-      // add SVG namespace declaration; don't however if there is a custom 
-      // prefix for SVG namespace
+      // add SVG namespace declaration
 
-      // NOTE: the following regular expression in this if statement
-      // right below had to be replaced since it was a performance
-      // bottleneck; see Issue 218
-      // for details: http://code.google.com/p/svgweb/issues/detail?id=218
-      if (svg.indexOf(':svg ') == -1) { // was regular expression
-        if (/xmlns\=['"]http:\/\/www\.w3\.org\/2000\/svg['"]/.test(svg) == false) {
-          svg = svg.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
-        }
-      }
+      if (/xmlns\=['"]http:\/\/www\.w3\.org\/2000\/svg['"]/.test(svg) == false) {
+        svg = svg.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+      }     
       
       // add xlink namespace if it is not present
       if (/xmlns:[^=]+=['"]http:\/\/www\.w3\.org\/1999\/xlink['"]/.test(svg) == false) {
@@ -1615,37 +1624,25 @@ extend(SVGWeb, {
       // 1) We don't parse comments into our DOM, 2) when we add our
       // <__text> sections below they can get incorrectly nested into multi
       // line comments; stripping them out is a simple solution for now.
-      var commentRE = /<!\-\-/g;
-      RegExp.lastIndex = 0; // reset global exec()
-      match = commentRE.exec(svg);
-      var i = 0;
-      var strippedSVG = svg;
-      while (match && RegExp.lastMatch) {
-        // get the text of the comment
-        var endIndx = RegExp.rightContext.indexOf('-->') + 3;
-        var comment = '<!--' + RegExp.rightContext.substring(0, endIndx);
-        
-        // now strip it out
-        strippedSVG = strippedSVG.replace(comment, '');
-        
-        // find next match
-        match = commentRE.exec(svg);
-        i++;
-      }
-      svg = strippedSVG;
+      
+      // this is preferable and more readable but most browsers and JavaScript
+      // do not support a Single Line Mode (i.e. .* matches everything
+      // _including_ new lines)
+      //svg = svg.replace(/<!\-\-.*?\-\->/gm, '');
+      svg = svg.replace(/<!\-\-[\s\S]*?\-\->/g, '');
       
       // We might have nested <svg> elements; we want to make sure we don't
       // incorrectly think these are SVG root elements. To do this, temporarily
       // rename the SVG root element, then rename nested <svg> root elements
       // to a temporary token that we will restore at the end of this method
-      svg = svg.replace(/<(svg:)?svg/, '<$1SVGROOT'); // root <svg> element
-      svg = svg.replace(/<(svg:)?svg/g, '<$1NESTEDSVG'); // nested <svg>
-      svg = svg.replace(/<(svg:)?SVGROOT/, '<$1svg');
+      svg = svg.replace(/<svg/, '<SVGROOT'); // root <svg> element
+      svg = svg.replace(/<svg/g, '<NESTEDSVG'); // nested <svg>
+      svg = svg.replace(/<SVGROOT/, '<svg');
       
       // break SVG string into pieces so that we don't incorrectly add our
       // <__text> fake text nodes outside the SVG root tag
-      var separator = svg.match(/<[a-zA-Z_-]*:?svg/)[0];
-      var pieces = svg.split(/<[a-zA-Z_-]*:?svg/);
+      var separator = svg.match(/<svg/)[0];
+      var pieces = svg.split(/<svg/);
       
       // extract CDATA sections temporarily so that we don't end up
       // adding double <__text> blocks
@@ -1678,8 +1675,7 @@ extend(SVGWeb, {
       }
       
       // capture anything between > and < tags
-      pieces[1] = pieces[1].replace(/>([^>]+)</g, 
-                                    '><__text>$1</__text><');
+      pieces[1] = pieces[1].replace(/>([^>]+)</g, '><__text>$1</__text><');
       
       // re-assemble our CDATA blocks
       if (hasCData) {
@@ -1697,7 +1693,7 @@ extend(SVGWeb, {
     
     // earlier we turned nested <svg> elements into a temporary token; restore
     // them
-    svg = svg.replace(/<(svg:)?NESTEDSVG/g, '<$1svg');
+    svg = svg.replace(/<NESTEDSVG/g, '<svg');
                  
     if (this.renderer == FlashHandler) {
       // handle Flash encoding issues
@@ -2162,9 +2158,16 @@ extend(SVGWeb, {
     if (window.addEventListener) {
       window._addEventListener = window.addEventListener;
       window.addEventListener = function(type, f, useCapture) {
-        if (type != 'load') {
+        if (type.toLowerCase() != 'svgload') {
           return window._addEventListener(type, f, useCapture);
         } else {
+          svgweb.addOnLoad(f);
+        }
+      }
+    } else {
+      // patch in addEventListener just for the svgload event
+      window.addEventListener = function(type, f, useCapture) {
+        if (type.toLowerCase() == 'svgload') {
           svgweb.addOnLoad(f);
         }
       }
@@ -2173,7 +2176,7 @@ extend(SVGWeb, {
     if (isIE && window.attachEvent) {
       window._attachEvent = window.attachEvent;
       window.attachEvent = function(type, f) {
-        if (type != 'onload') {
+        if (type.toLowerCase() != 'onsvgload') {
           return window._attachEvent(type, f);
         } else {
           svgweb.addOnLoad(f);
@@ -2183,17 +2186,36 @@ extend(SVGWeb, {
   },
   
   _saveWindowOnload: function() {
-    // intercept and save window.onload or <body onload="">
-    if (window.onload) {
+    // intercept and save window.onsvgload or <body onsvgload="">
+    var onsvgload = window.onsvgload;
+    // browsers will replace any previous window.onload listeners
+    // with a <body onload=""> listener; simulate this for onsvgload
+    if (document.getElementsByTagName('body')) {
+      var body = document.getElementsByTagName('body')[0];
+      if (body.getAttribute('onsvgload')) {
+        callbackStr = body.getAttribute('onsvgload');
+        onsvgload = (function(callbackStr) {
+          // FIXME: What should 'this' refer to when body.onload
+          // is simulated? The body tag? The window object?
+          return function() {
+            eval(callbackStr);
+          }
+        })(callbackStr);
+      }
+    }
+    
+    if (onsvgload) {
       // preserve IE's different behavior of firing window.onload 
       // behavior _before_ everything else; other browsers don't necessarily
-      // give preferential treatment to window.onload
+      // give preferential treatment to window.onload. Even though we
+      // now use window.onsvgload instead of window.onload preserve
+      // this behavior.
       if (isIE) {
-        this._loadListeners.splice(0, 0, window.onload);
+        this._loadListeners.splice(0, 0, onsvgload);
       } else {
-        this._loadListeners.push(window.onload);
+        this._loadListeners.push(onsvgload);
       }
-      window.onload = null;
+      window.onsvgload = onsvgload = null;
     }
   }
 });
@@ -2724,7 +2746,7 @@ FlashHandler._createElement = function(nodeName, forSVG) {
       _obj.addEventListener = function(type, listener, useCapture) {
         // handle onloads special
         // NOTE: 'this' == our SVG OBJECT
-        if (type == 'load') {
+        if (type.toLowerCase() == 'svgload') {
           this._onloadListeners.push(listener);
         } else if (!addEventListener) { // IE
           this.attachEvent('on' + type, listener);
@@ -3082,11 +3104,11 @@ extend(FlashHandler, {
     // which is what flash provides as node.transform.concatenatedMatrix.
     var evt = { target: target._getProxyNode(),
                 currentTarget: currentTarget._getProxyNode(),
+                type: msg.eventType,
                 clientX: new Number(msg.stageX),
                 clientY: new Number(msg.stageY),
                 screenX: new Number(msg.stageX),
                 screenY: new Number(msg.stageY),
-                type: msg.eventType,
                 altKey: msg.altKey,
                 ctrlKey: msg.ctrlKey,
                 shiftKey: msg.shiftKey,
@@ -3108,11 +3130,11 @@ extend(FlashHandler, {
                       target._getProxyNode().getAttribute('id') + '") ,\n' +
                     'currentTarget:document.getElementById("' +
                       currentTarget._getProxyNode().getAttribute('id') + '") ,\n' +
+                    'type: "' + msg.eventType + '",\n' +
                     'clientX: ' + new Number(msg.stageX) + ',\n' +
                     'clientY: ' + new Number(msg.stageY) + ',\n' +
                     'screenX: ' + new Number(msg.stageX) + ',\n' +
                     'screenY: ' + new Number(msg.stageY) + ',\n' +
-                    'type: "' + msg.eventType + '",\n' +
                     'altKey: ' + msg.altKey + ',\n' +
                     'ctrlKey: ' + msg.ctrlKey + ',\n' +
                     'shiftKey: ' + msg.shiftKey + ',\n' +
@@ -3193,28 +3215,27 @@ extend(FlashHandler, {
   },
 
   _onViewSourceDynamic: function(msg) {
-
-    // Add xml tag if not present
+    // add xml tag if not present
     if (msg.source.indexOf('<?xml') == -1) {
       msg.source='<?xml version="1.0"?>\n' + msg.source;
     }
 
-    // Remove svg web artifacts
-    msg.source=msg.source.replace(/<svg:([^ ]+) /g,'<$1 ');
-    msg.source=msg.source.replace(/<\/svg:([^>]+)>/g,'<\/$1>');
-    msg.source=msg.source.replace(/\n\s*<__text[^\/]*\/>/gm,'');
-    msg.source=msg.source.replace(/<__text[^>]*>([^<]*)<\/__text>/gm,'$1');
-    msg.source=msg.source.replace(/<__text[^>]*>/g,'');
-    msg.source=msg.source.replace(/<\/__text>/g,'');
-    msg.source=msg.source.replace(/ __guid="[^"]*"/g,'');
-    msg.source=msg.source.replace(/ id="__svg__random__[^"]*"/g,'');
-    msg.source=msg.source.replace(/>\n\n/g,'>\n');
+    // remove svg web artifacts
+    msg.source=msg.source.replace(/<svg:([^ ]+) /g, '<$1 ');
+    msg.source=msg.source.replace(/<\/svg:([^>]+)>/g, '<\/$1>');
+    msg.source=msg.source.replace(/\n\s*<__text[^\/]*\/>/gm, '');
+    msg.source=msg.source.replace(/<__text[^>]*>([^<]*)<\/__text>/gm, '$1');
+    msg.source=msg.source.replace(/<__text[^>]*>/g, '');
+    msg.source=msg.source.replace(/<\/__text>/g, '');
+    msg.source=msg.source.replace(/\s*__guid="[^"]*"/g, '');
+    msg.source=msg.source.replace(/ id="__svg__random__[^"]*"/g, '');
+    msg.source=msg.source.replace(/>\n\n/g, '>\n');
     
-    // Escape tags
-    msg.source=msg.source.replace(/>/g,'&gt;');
-    msg.source=msg.source.replace(/</g,'&lt;');
+    // escape tags
+    msg.source=msg.source.replace(/>/g, '&gt;');
+    msg.source=msg.source.replace(/</g, '&lt;');
     
-    // Place source in a new window
+    // place source in a new window
     var w = window.open('', '_blank');
     w.document.write('<body><pre>' + msg.source + '</pre></body>');
     w.document.close();
@@ -3370,8 +3391,7 @@ NativeHandler._patchBrowserObjects = function(win, doc) {
         expr = '//' + localName;
       }
       
-      xpathResults = xpath(doc, handler._svgRoot, expr, 
-                           handler._namespaces);
+      xpathResults = xpath(doc, handler._svgRoot, expr, handler._namespaces);
       if (xpathResults !== null && xpathResults !== undefined
           && xpathResults.length > 0) {
         for (var j = 0; j < xpathResults.length; j++) {
@@ -3447,6 +3467,15 @@ NativeHandler._patchBrowserObjects = function(win, doc) {
   if (isFF) {
     NativeHandler._patchStyleObject(win);
   }
+  
+  // make sure that calls to window.addEventListener('SVGLoad', ...) or
+  // window.onsvgload made from external SVG files works if done _after_
+  // the normal window.onload call has fired
+  var rootElement = doc.rootElement;
+  if (rootElement && rootElement.localName == 'svg'
+      && rootElement.namespaceURI == svgns) {
+    NativeHandler._patchSvgFileAddEventListener(win, doc);
+  }
 };
 
 /** If someone calls cloneNode, our patched addEventListener method goes away;
@@ -3503,7 +3532,7 @@ NativeHandler._patchAddEventListener = function(root) {
   root._onloadListeners = [];
   root.addEventListener = (function(self) {
     return function(type, f, useCapture) {
-      if (type == 'SVGLoad' || type == 'load') {
+      if (type.toLowerCase() == 'svgload') {
         this._onloadListeners.push(f);
       } else {
         root._addEventListener(type, f, useCapture);
@@ -3564,6 +3593,49 @@ NativeHandler._patchStyleObject = function(win) {
       );
     })(styleName, stylePropName); // pass closure values
   }
+};
+
+/**
+  This method is meant to address the following edge condition. If we
+  have an external SVG file that we have brought in using an SVG
+  OBJECT tag, such as foobar.svg, inside _that_ external SVG file
+  there might be nested calls to know when SVG Web is done loading
+  _after_ the page has loaded:
+  
+  foobar.svg:
+  <svg>
+    <script>
+      window.addEventListener('load', function() {
+        // be able to handle this!
+        window.addEventListener('SVGLoad', function() {
+          // this should fire
+        }, false);
+      }, false);
+    </script>
+  </svg>
+  
+  @param win The owner window to patch.
+  @param doc The owner document to work with.
+*/
+NativeHandler._patchSvgFileAddEventListener = function(win, doc) {
+  var _addEventListener = win.addEventListener;
+  win.addEventListener = function(type, listener, useCapture) {
+    if (type.toLowerCase() != 'svgload') {
+      _addEventListener(type, listener, useCapture);
+    } else {
+      if (doc.readyState == 'complete') {
+        listener();
+      }
+    }
+  }
+  
+  win.__defineGetter__('onsvgload', function() {
+    return this.__onsvgload;
+  });
+  win.__defineSetter__('onsvgload', function(listener) {
+    this.__onsvgload = listener;
+    this.addEventListener('SVGLoad', listener, false);
+  });
 };
 
 // end of static singleton functions
@@ -4131,6 +4203,11 @@ extend(_Node, {
       throw 'Not supported';
     }
     
+    // Issue 296: existing child should not be added again
+    if (newChild.parentNode) {
+      newChild.parentNode.removeChild(newChild);
+    }
+    
     // if the children are DOM nodes, turn them into _Node or _Element
     // references
     newChild = this._getFakeNode(newChild);
@@ -4182,11 +4259,9 @@ extend(_Node, {
     // inform Flash about the change
     if (this._attached && this._passThrough) {
       var xmlString = FlashHandler._encodeFlashData(
-                          xmlToStr(newChild, 
-                                   this._handler.document._namespaces));
+                          xmlToStr(newChild, this._handler.document._namespaces));
       this._handler.sendToFlash('jsInsertBefore',
-                                [ refChild._guid, this._guid, position,
-                                  xmlString ]);
+                                [ refChild._guid, this._guid, position, xmlString ]);
     }
     
     if (!isIE) {
@@ -4212,6 +4287,11 @@ extend(_Node, {
     if (this.nodeType != _Node.ELEMENT_NODE
         && this.nodeType != _Node.DOCUMENT_FRAGMENT_NODE) {
       throw 'Not supported';
+    }
+    
+    // Issue 296: existing child should not be added again
+    if (newChild.parentNode) {
+      newChild.parentNode.removeChild(newChild);
     }
     
     // the children could be DOM nodes; turn them into something we can
@@ -4294,8 +4374,7 @@ extend(_Node, {
     // tell Flash about the newly inserted child
     if (this._attached && this._passThrough) {
       var xmlString = FlashHandler._encodeFlashData(
-                            xmlToStr(newChild, 
-                                     this._handler.document._namespaces));
+                            xmlToStr(newChild, this._handler.document._namespaces));
       this._handler.sendToFlash('jsAddChildAt',
                                 [ this._guid, position, xmlString ]);
     }
@@ -4401,6 +4480,11 @@ extend(_Node, {
       throw 'Not supported';
     }
     
+    // Issue 296: existing child should not be added again
+    if (child.parentNode) {
+      child.parentNode.removeChild(child);
+    }
+    
     // the child could be a DOM node; turn it into something we can
     // work with, such as a _Node or _Element
     child = this._getFakeNode(child);
@@ -4462,8 +4546,7 @@ extend(_Node, {
       // the <__document__fragment> tag over to Flash so it knows what it is
       // dealing with
       var xmlString = FlashHandler._encodeFlashData(
-                        xmlToStr(child, 
-                                 this._handler.document._namespaces));
+                        xmlToStr(child, this._handler.document._namespaces));
       this._handler.sendToFlash('jsAppendChild', [ this._guid, xmlString ]);
     }
 
@@ -4566,8 +4649,7 @@ extend(_Node, {
     if (!_adding && !this._attached) {
       // add to a list of event listeners that will get truly registered when
       // we get attached in _Node._processAppendedChildren()
-      this._detachedListeners.push({ type: type, listener: listener, 
-                                     useCapture: useCapture });
+      this._detachedListeners.push({ type: type, listener: listener, useCapture: useCapture });
       return;
     }
     
@@ -4599,6 +4681,12 @@ extend(_Node, {
                                   listener(evt);
                                 }
                               })(listener);
+      // persist information about this listener so we can easily remove
+      // it later
+      wrappedListener.__type = type;
+      wrappedListener.__listener = listener;
+      wrappedListener.__useCapture = useCapture; 
+      
       // save keyboard listeners for later so we can clean them up
       // later if the parent SVG document is removed from the DOM
       this._handler._keyboardListeners.push(wrappedListener);
@@ -4619,7 +4707,38 @@ extend(_Node, {
       throw 'Not supported';
     }
     
-    // TODO: Implement
+    var pos;
+    
+    if (!this._attached) {
+      // remove from our list of event listeners that we keep around until
+      // _Node._processAppendedChildren() is called
+      pos = this._findListener(this._detachedListeners, type, listener, useCapture);
+      if (pos !== null) {
+        delete this._detachedListeners[pos];
+      }
+      return;
+    }
+
+    // remove from our list of event listeners
+    pos = this._findListener(this._listeners, type, listener, useCapture);
+    if (pos !== null) {
+      // FIXME: Ensure that if identical listeners are added twice that they collapse to
+      // just one entry or else this will fail to delete more than the first one.
+      delete this._listeners[pos];
+      delete this._listeners[type]['_' + listener.toString() + ':' + useCapture];
+    }
+    
+    if (type == 'keydown') {
+      // FIXME: We really need to remove keypress logic from being handled by us
+      pos = this._findListener(this._keyboardListeners, type, listener, useCapture);
+      if (pos !== null) {
+        // FIXME: Ensure that if identical listeners are added twice that they collapse to
+        // just one entry or else this will fail to delete more than the first one.
+        delete this._keyboardListeners[pos];
+      }
+    }
+    
+    this._handler.sendToFlash('jsRemoveEventListener', [ this._guid, type ]);
   },
 
   getScreenCTM: function() {
@@ -5538,6 +5657,19 @@ extend(_Node, {
       }
       c._persistEventListeners();
     }
+  },
+  
+  /** Finds a listener in the given listenerArray using the given type, listener, and useCapture
+      values, returning the index position. Returns null the listener is not found. */
+  _findListener: function(listenerArray, type, listener, useCapture) {
+    for (var i = 0; i < listenerArray.length; i++) {
+      var l = listenerArray[i];
+      if (l.listener == listener && l.type == type && l.useCapture == useCapture) {
+        return i;
+      }
+    }
+    
+    return null;
   }
 });
 
@@ -5724,9 +5856,10 @@ extend(_Element, {
     }
     
     if (!attrNode) {
-      //console.log('No attribute node found for: ' + localName
-      //            + ' in the namespace: ' + ns);
-      return;
+       // JL - remove this as it logs all the time when using protovis.
+       //console.log('No attribute node found for: ' + localName
+       //            + ' in the namespace: ' + ns);
+       return;
     }
         
     // remove from our XML
@@ -5901,7 +6034,7 @@ extend(_Element, {
       // and the namespace aware xml.getElementsByTagNameNS is not supported
       var namespaces = null;
       if (this._attached) {
-        namespaces = this._handler._namespaces;
+        namespaces = this._handler.document._namespaces;
       }
       
       // figure out prefix
@@ -7018,13 +7151,13 @@ extend(_SVGObject, {
       var pathname = this.url.replace(/[^:]*:\/\/[^\/]*/).match(/\/?[^\?\#]*/)[0];
       if (pathname && pathname.length > 0 && pathname.indexOf('/') != -1) {
         // snip off any filename after a final slash
-        results = pathname.replace(/\/([^/]*)$/, '/');
+        results = pathname.replace(/\/([^\/]*)$/, '/');
       }
     } else {
       var pathname = window.location.pathname.toString();
       if (pathname && pathname.length > 0 && pathname.indexOf('/') != -1) {
         // snip off any filename after a final slash
-        results = pathname.replace(/\/([^/]*)$/, '/');
+        results = pathname.replace(/\/([^\/]*)$/, '/');
       }
     }
 
@@ -7190,7 +7323,7 @@ function _SVGWindow(handler) {
 
 extend(_SVGWindow, {
   addEventListener: function(type, listener, capture) {
-    if (type == 'load' || type == 'SVGLoad') {
+    if (type.toLowerCase() == 'SVGLoad') {
       this._onloadListeners.push(listener);
     }
   },
@@ -8338,7 +8471,7 @@ extend(_SVGSVGElement, {
       }
     }
     
-    this._handler.document.rootElement = this;
+    this._handler.document.rootElement = this._getProxyNode();
     
     var elementId = this._nodeXML.getAttribute('id');
     this._handler._loaded = true;
@@ -8355,7 +8488,7 @@ extend(_SVGSVGElement, {
     var pathname = window.location.pathname.toString();
     if (pathname && pathname.length > 0 && pathname.indexOf('/') != -1) {
       // snip off any filename after a final slash
-      results = pathname.replace(/\/([^/]*)$/, '/');
+      results = pathname.replace(/\/([^\/]*)$/, '/');
     }
 
     return results;
@@ -8521,7 +8654,7 @@ extend(_Document, {
     // Make sure to include root SVG node in our results if that is what
     // is asked for!
     if (ns == svgns && localName == 'svg') {
-      results.push(this.rootElement._getProxyNode());
+      results.push(this.rootElement);
     }
     
     return results;

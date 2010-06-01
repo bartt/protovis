@@ -168,7 +168,7 @@ pv.listenForPageLoad = function(listener) {
     } else if ( document.attachEvent ) {
 
         // A fallback to window.onload, that will always work
-        window.attachEvent( "onload", listener );
+        window.attachEvent( "onsvgload", listener );
     }
 }
 
