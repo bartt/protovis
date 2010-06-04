@@ -1,4 +1,4 @@
-// 6e29b5a9e69b8c7910feedf5f80d079fa3bfa36c
+// aa05d1008fafd84bc6c3c7fc358768d05caedbe4
 /**
  * @class The built-in Array class.
  * @name Array
@@ -366,17 +366,21 @@ pv.listenForPageLoad = function(listener) {
         listener();
     }
 
-    // Mozilla, Opera and webkit nightlies currently support this event
-    if ( document.addEventListener ) {
+    if (pv.renderer() == "svgweb") {
+        window.addEventListener( "SVGLoad", listener, false );
+    } else {
+        // Mozilla, Opera and webkit nightlies currently support this event
+        if ( document.addEventListener ) {
 
-        // A fallback to window.onload, that will always work
-        window.addEventListener( "load", listener, false );
+            // A fallback to window.onload, that will always work
+            window.addEventListener( "load", listener, false );
 
-        // If IE event model is used
-    } else if ( document.attachEvent ) {
+            // If IE event model is used
+        } else if ( document.attachEvent ) {
 
-        // A fallback to window.onload, that will always work
-        window.attachEvent( "onsvgload", listener );
+            // A fallback to window.onload, that will always work
+            window.attachEvent( "load", listener );
+        }
     }
 }
 

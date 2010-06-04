@@ -5856,10 +5856,10 @@ extend(_Element, {
     }
     
     if (!attrNode) {
-       // JL - remove this as it logs all the time when using protovis.
-       //console.log('No attribute node found for: ' + localName
-       //            + ' in the namespace: ' + ns);
-       return;
+      // JL: This happens under protovis all the time. Remove the warning for the time being.
+      //console.log('No attribute node found for: ' + localName
+      //            + ' in the namespace: ' + ns);
+      return;
     }
         
     // remove from our XML
