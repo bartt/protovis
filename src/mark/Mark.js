@@ -214,7 +214,8 @@ pv.Mark.prototype
     .property("title", String)
     .property("reverse", Boolean)
     .property("antialias", Boolean)
-    .property("events", String);
+    .property("events", String)
+    .property("id", String);
 
 /**
  * The mark type; a lower camelCase name. The type name controls rendering
@@ -234,6 +235,13 @@ pv.Mark.prototype
  *
  * @type pv.Mark
  * @name pv.Mark.prototype.proto
+ */
+
+/**
+ * The mark anchor target, possibly undefined.
+ *
+ * @type pv.Mark
+ * @name pv.Mark.prototype.target
  */
 
 /**
@@ -268,7 +276,7 @@ pv.Mark.prototype.index = -1;
  * scale can be used to create scale-independent graphics. For example, to
  * define a dot that has a radius of 10 irrespective of any zooming, say:
  *
- * <pre>dot.radius(function() 10 / this.scale)</pre>
+ * <pre>dot.shapeRadius(function() 10 / this.scale)</pre>
  *
  * Note that the stroke width and font size are defined irrespective of scale
  * (i.e., in screen space) already. Also note that when a transform is applied
@@ -413,6 +421,15 @@ pv.Mark.prototype.scale = 1;
  */
 
 /**
+ * The instance identifier, for correspondence across animated transitions. If
+ * no identifier is specified, correspondence is determined using the mark
+ * index. Identifiers are not global, but local to a given mark.
+ *
+ * @type String
+ * @name pv.Mark.prototype.id
+ */
+
+/**
  * Default properties for all mark types. By default, the data array is the
  * parent data as a single-element array; if the data property is not specified,
  * this causes each mark to be instantiated as a singleton with the parents
@@ -440,6 +457,7 @@ pv.Mark.prototype.defaults = new pv.Mark()
  */
 pv.Mark.prototype.extend = function(proto) {
   this.proto = proto;
+  this.target = proto.target;
   return this;
 };
 
@@ -505,52 +523,20 @@ pv.Mark.prototype.def = function(name, v) {
  * @returns {pv.Anchor} the new anchor.
  */
 pv.Mark.prototype.anchor = function(name) {
-  var target = this, scene;
-
-  /* Default anchor name. */
-  if (!name) name = "center";
-
-  /** @private Find the instances of target that match source. */
-  function instances(source) {
-    var mark = target, index = [];
-
-    /* Mirrored descent. */
-    while (!(scene = mark.scene)) {
-      source = source.parent;
-      index.push({index: source.index, childIndex: mark.childIndex});
-      mark = mark.parent;
-    }
-    while (index.length) {
-      var i = index.pop();
-      scene = scene[i.index].children[i.childIndex];
-    }
-
-    /*
-     * When the anchor target is also an ancestor, as in the case of adding
-     * to a panel anchor, only generate one instance per panel. Also, set
-     * the margins to zero, since they are offset by the enclosing panel.
-     */
-    if (target.hasOwnProperty("index")) {
-      var s = pv.extend(scene[target.index]);
-      s.right = s.top = s.left = s.bottom = 0;
-      return [s];
-    }
-    return scene;
-  }
-
+  if (!name) name = "center"; // default anchor name
   return new pv.Anchor(this)
     .name(name)
-    .def("$mark.anchor", function() {
-        scene = this.scene.target = instances(this);
-      })
     .data(function() {
-        return scene.map(function(s) { return s.data; });
+        return this.scene.target.map(function(s) { return s.data; });
       })
     .visible(function() {
-        return scene[this.index].visible;
+        return this.scene.target[this.index].visible;
+      })
+    .id(function() {
+        return this.scene.target[this.index].id;
       })
     .left(function() {
-        var s = scene[this.index], w = s.width || 0;
+        var s = this.scene.target[this.index], w = s.width || 0;
         switch (this.name()) {
           case "bottom":
           case "top":
@@ -560,7 +546,7 @@ pv.Mark.prototype.anchor = function(name) {
         return s.left + w;
       })
     .top(function() {
-        var s = scene[this.index], h = s.height || 0;
+        var s = this.scene.target[this.index], h = s.height || 0;
         switch (this.name()) {
           case "left":
           case "right":
@@ -570,11 +556,11 @@ pv.Mark.prototype.anchor = function(name) {
         return s.top + h;
       })
     .right(function() {
-        var s = scene[this.index];
+        var s = this.scene.target[this.index];
         return this.name() == "left" ? s.right + (s.width || 0) : null;
       })
     .bottom(function() {
-        var s = scene[this.index];
+        var s = this.scene.target[this.index];
         return this.name() == "top" ? s.bottom + (s.height || 0) : null;
       })
     .textAlign(function() {
@@ -597,20 +583,9 @@ pv.Mark.prototype.anchor = function(name) {
       });
 };
 
-/**
- * Returns the anchor target of this mark, if it is derived from an anchor;
- * otherwise returns null. For example, if a label is derived from a bar anchor,
- *
- * <pre>bar.anchor("top").add(pv.Label);</pre>
- *
- * then property functions on the label can refer to the bar via the
- * <tt>anchorTarget</tt> method. This method is also useful for mark types
- * defining properties on custom anchors.
- *
- * @returns {pv.Mark} the anchor target of this mark; possibly null.
- */
+/** @deprecated Replaced by {@link #target}. */
 pv.Mark.prototype.anchorTarget = function() {
-  return this.proto.anchorTarget();
+  return this.target;
 };
 
 /**
@@ -640,6 +615,38 @@ pv.Mark.prototype.instance = function(defaultIndex) {
   var scene = this.scene || this.parent.instance(-1).children[this.childIndex],
       index = !arguments.length || this.hasOwnProperty("index") ? this.index : defaultIndex;
   return scene[index < 0 ? scene.length - 1 : index];
+};
+
+/**
+ * @private Find the instances of this mark that match source.
+ *
+ * @see pv.Anchor
+ */
+pv.Mark.prototype.instances = function(source) {
+  var mark = this, index = [], scene;
+
+  /* Mirrored descent. */
+  while (!(scene = mark.scene)) {
+    source = source.parent;
+    index.push({index: source.index, childIndex: mark.childIndex});
+    mark = mark.parent;
+  }
+  while (index.length) {
+    var i = index.pop();
+    scene = scene[i.index].children[i.childIndex];
+  }
+
+  /*
+   * When the anchor target is also an ancestor, as in the case of adding
+   * to a panel anchor, only generate one instance per panel. Also, set
+   * the margins to zero, since they are offset by the enclosing panel.
+   */
+  if (this.hasOwnProperty("index")) {
+    var s = pv.extend(scene[this.index]);
+    s.right = s.top = s.left = s.bottom = 0;
+    return [s];
+  }
+  return scene;
 };
 
 /**
@@ -817,7 +824,7 @@ pv.Mark.stack = [];
  * do not need to be queried during build.
  */
 pv.Mark.prototype.bind = function() {
-  var seen = {}, types = [[], [], [], []], data, visible;
+  var seen = {}, types = [[], [], [], []], data, required = [];
 
   /** Scans the proto chain for the specified mark. */
   function bind(mark) {
@@ -829,7 +836,7 @@ pv.Mark.prototype.bind = function() {
           seen[p.name] = p;
           switch (p.name) {
             case "data": data = p; break;
-            case "visible": visible = p; break;
+            case "visible": case "id": required.push(p); break;
             default: types[p.type].push(p); break;
           }
         }
@@ -862,7 +869,7 @@ pv.Mark.prototype.bind = function() {
     properties: seen,
     data: data,
     defs: defs,
-    required: [visible],
+    required: required,
     optional: pv.blend(types)
   };
 };
@@ -891,7 +898,7 @@ pv.Mark.prototype.bind = function() {
  * special. The <tt>data</tt> property is evaluated first; unlike the other
  * properties, the data stack is from the parent panel, rather than the current
  * mark, since the data is not defined until the data property is evaluated.
- * The <tt>visisble</tt> property is subsequently evaluated for each instance;
+ * The <tt>visible</tt> property is subsequently evaluated for each instance;
  * only if true will the {@link #buildInstance} method be called, evaluating
  * other properties and recursively building the scene graph.
  *
@@ -913,6 +920,9 @@ pv.Mark.prototype.build = function() {
       scene.parentIndex = this.parent.index;
     }
   }
+
+  /* Resolve anchor target. */
+  if (this.target) scene.target = this.target.instances(scene);
 
   /* Evaluate defs. */
   if (this.binds.defs.length) {
@@ -1017,9 +1027,13 @@ pv.Mark.prototype.buildImplied = function(s) {
   if (w == null) {
     w = width - (r = r || 0) - (l = l || 0);
   } else if (r == null) {
-    r = width - w - (l = l || 0);
+    if (l == null) {
+      l = r = (width - w) / 2;
+    } else {
+      r = width - w - l;
+    }
   } else if (l == null) {
-    l = width - w - (r = r || 0);
+    l = width - w - r;
   }
 
   /* Compute implied height, bottom and top. */
@@ -1027,9 +1041,13 @@ pv.Mark.prototype.buildImplied = function(s) {
   if (h == null) {
     h = height - (t = t || 0) - (b = b || 0);
   } else if (b == null) {
-    b = height - h - (t = t || 0);
+    if (t == null) {
+      b = t = (height - h) / 2;
+    } else {
+      b = height - h - t;
+    }
   } else if (t == null) {
-    t = height - h - (b = b || 0);
+    t = height - h - b;
   }
 
   s.left = l;
@@ -1221,4 +1239,12 @@ pv.Mark.dispatch = function(type, scene, index) {
       if (m && m.render) m.render();
     });
   return true;
+};
+
+pv.Mark.prototype.transition = function() {
+  return new pv.Transition(this);
+};
+
+pv.Mark.prototype.on = function(state) {
+  return this["$" + state] = new pv.Transient(this);
 };

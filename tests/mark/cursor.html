@@ -1,12 +1,9 @@
 <html>
   <head>
     <title>Cursor</title>
-    <script type="text/javascript" src="../../3rdparty/svg.js" data-path="../../3rdparty"></script>
-<script type="text/javascript" src="../../3rdparty/svg.js" data-path="../../3rdparty/"></script>
-    <script type="text/javascript" src="../../protovis-d3.2.js"></script>
+    <script type="text/javascript" src="../../3rdparty/svg.js" data-path="../../3rdparty/"></script>
     <meta name="svg.render.forceflash" content="true">
-
-    <meta name="svg.render.forceflash" content="true">
+    <script type="text/javascript" src="../../protovis-d3.3.js"></script>
   </head>
   <body>
     <script type="text/javascript+protovis">
@@ -16,6 +13,7 @@ var vis = new pv.Panel()
     .height(300);
 
 vis.add(pv.Bar)
+    .top(0)
     .height(100)
     .fillStyle("brown")
     .cursor("hand")

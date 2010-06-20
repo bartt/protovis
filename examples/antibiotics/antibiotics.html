@@ -4,7 +4,7 @@
     <link type="text/css" rel="stylesheet" href="../ex.css"/>
     <script type="text/javascript" src="../../3rdparty/svg.js" data-path="../../3rdparty"></script>
     <meta name="svg.render.forceflash" content="true">
-    <script type="text/javascript" src="../../protovis-r3.2.js"></script>
+    <script type="text/javascript" src="../../protovis-r3.3.js"></script>
     <script type="text/javascript" src="antibiotics.js"></script>
     <style type="text/css">
 
@@ -90,7 +90,7 @@ bg.add(pv.Dot)
     .fillStyle(null)
     .strokeStyle("#eee")
     .lineWidth(1)
-    .size(function(i) Math.pow(radius(Math.pow(10, i)), 2))
+    .shapeSize(function(i) Math.pow(radius(Math.pow(10, i)), 2))
   .anchor("top").add(pv.Label)
     .visible(function(i) i < 3)
     .textBaseline("middle")
@@ -129,7 +129,7 @@ vis.add(pv.Dot)
     .bottom(function() -60 + this.index * 18)
     .fillStyle(function(d) gramColor[d])
     .strokeStyle(null)
-    .size(30)
+    .shapeSize(30)
   .anchor("right").add(pv.Label)
     .textMargin(6)
     .textAlign("left")
@@ -138,5 +138,5 @@ vis.add(pv.Dot)
 vis.render();
 
     </script>
-  </center></body>
+  </div></div></body>
 </html>

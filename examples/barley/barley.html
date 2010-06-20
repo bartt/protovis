@@ -4,7 +4,7 @@
     <link type="text/css" rel="stylesheet" href="../ex.css"/>
     <script type="text/javascript" src="../../3rdparty/svg.js" data-path="../../3rdparty"></script>
     <meta name="svg.render.forceflash" content="true">
-    <script type="text/javascript" src="../../protovis-r3.2.js"></script>
+    <script type="text/javascript" src="../../protovis-r3.3.js"></script>
     <script type="text/javascript" src="barley.js"></script>
     <style type="text/css">
 
@@ -69,7 +69,7 @@ var dot = cell.add(pv.Panel)
     .data(function(year) year.values)
     .left(function(d) x(d.yield))
     .top(function() this.index * 11)
-    .size(10)
+    .shapeSize(10)
     .lineWidth(2)
     .strokeStyle(function(d) c(d.year));
 
