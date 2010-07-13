@@ -32,8 +32,7 @@ vis.add(pv.Dot)
 .bottom(function (d) {return y(d.y)} )
 .left(function(d) {return x(d.x) })
     .strokeStyle('green')
-.visible (function (d) {return this.index == vis.i() })
-    .size(5);
+.visible (function (d) {return this.index == vis.i() });
 
 vis.add (pv.Bar)
     .fillStyle ("rgba(0,0,0,0.001)")

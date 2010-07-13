@@ -737,6 +737,9 @@ extend(SVGWeb, {
       level rather than on individual handlers because a removed node
       might have never been associated with a real DOM or a real handler. */
   _removedNodes: [],
+
+  /** Used to lookup namespaces **/
+  _allSVGNamespaces: [],
   
   /** Adds an event listener to know when both the page, the internal SVG
       machinery, and any SVG SCRIPTS or OBJECTS are finished loading.
@@ -940,11 +943,15 @@ extend(SVGWeb, {
         // been registered inside this object; see _SVGWindow.setTimeout
         // for details
         var iframeWin = nodeHandler.document.defaultView;
-        for (var i = 0; i < iframeWin._intervalIDs.length; i++) {
-          iframeWin.clearInterval(iframeWin._intervalIDs[i]);
+        if (iframeWin._intervalIDs) {
+          for (var i = 0; i < iframeWin._intervalIDs.length; i++) {
+            iframeWin.clearInterval(iframeWin._intervalIDs[i]);
+          }
         }
-        for (var i = 0; i < iframeWin._timeoutIDs.length; i++) {
-          iframeWin.clearTimeout(iframeWin._timeoutIDs[i]);
+        if (iframeWin._timeoutIDs) {
+          for (var i = 0; i < iframeWin._timeoutIDs.length; i++) {
+            iframeWin.clearTimeout(iframeWin._timeoutIDs[i]);
+          }
         }
       
         // remove keyboard event handlers; we added a record of these for
@@ -1915,8 +1922,7 @@ extend(SVGWeb, {
           current = null;
         } else {
           current = current.parentNode;
-          if (current.nodeType != 1
-              || current.nodeName.toUpperCase() == 'SVG') {
+          if (current.nodeType != 1) {
             current = null;
           }
         }
@@ -1965,7 +1971,16 @@ extend(SVGWeb, {
           // fetch the root so that our 'this' context correctly
           // points to the root node inside of our onload function
           var root = document.getElementById(handler.id);
-          f.apply(root);
+          if (isOpera) {
+            // Opera 10.53 does not like this thread, probably because
+            // it originated from flash. Strange problems occur, like the
+            // thread just stops in various places. setTimeout seems to
+            // set up a better thread. This is the same workaround as
+            // in _SVGObject._executeScript().
+            setTimeout(function() { f.apply(root);f=null;root=null; }, 1);
+          } else {
+            f.apply(root);
+          }
         } catch (exp) {
           console.log('Error while firing onload listener: ' 
                       + exp.message || exp);
@@ -2169,6 +2184,10 @@ extend(SVGWeb, {
       window.addEventListener = function(type, f, useCapture) {
         if (type.toLowerCase() == 'svgload') {
           svgweb.addOnLoad(f);
+        } else {
+          if (isIE && window.attachEvent) {
+            return window.attachEvent('on' + type, f);
+          }
         }
       }
     }
@@ -2658,8 +2677,11 @@ FlashHandler._getElementsByTagNameNS = function(ns, localName) {
     a memory leak on IE. Note that this function runs in the global
     scope, so 'this' will not refer to our object instance but rather
     the window object. */
-FlashHandler._createElementNS = function(ns, qname) {
+FlashHandler._createElementNS = function(ns, qname, forSVG) {
   //console.log('createElementNS, ns='+ns+', qname='+qname);
+  if (forSVG === undefined) {
+     forSVG = false;
+  }
   if (ns === null || ns == 'http://www.w3.org/1999/xhtml') {
     if (isIE) {
       return document.createElement(qname);
@@ -2681,7 +2703,11 @@ FlashHandler._createElementNS = function(ns, qname) {
   // someone might be using this library on an XHTML page;
   // only use our overridden createElementNS if they are using
   // a namespace we have never seen before
-  if (!isIE) {
+  if (!isIE && !forSVG) {
+    // Check namespaces from unattached svg elements
+    if (svgweb._allSVGNamespaces['_' + ns]) {
+      namespaceFound = true;
+    }
     for (var i = 0; !namespaceFound && i < svgweb.handlers.length; i++) {
       if (svgweb.handlers[i].type == 'script'
           && svgweb.handlers[i].document._namespaces['_' + ns]) {
@@ -2696,17 +2722,30 @@ FlashHandler._createElementNS = function(ns, qname) {
   }
   
   var prefix;
-  for (var i = 0; i < svgweb.handlers.length; i++) {
-    if (svgweb.handlers[i].type == 'script') {
-      prefix = svgweb.handlers[i].document._namespaces['_' + ns];
-      if (prefix) {
-        break;
+  // Check namespaces from unattached svg elements
+  if (svgweb._allSVGNamespaces['_' + ns]) {
+    prefix = svgweb._allSVGNamespaces['_' + ns];
+  } else {
+    // Check attached svg elements
+    for (var i = 0; i < svgweb.handlers.length; i++) {
+      if (svgweb.handlers[i].type == 'script') {
+        prefix = svgweb.handlers[i].document._namespaces['_' + ns];
+        if (prefix) {
+          break;
+        }
       }
     }
   }
   
   if (prefix == 'xmlns' || !prefix) { // default SVG namespace
-    prefix = null;
+    // If this is a new namespace, we may have to assume the
+    // prefix from the qname
+    if (qname.indexOf(':') != -1) {
+      prefix=qname.substring(0, qname.indexOf(':'))
+    }
+    else {
+      prefix = null;
+    }
   }
 
   var node = new _Element(qname, prefix, ns);
@@ -2977,7 +3016,15 @@ extend(FlashHandler, {
       this._redrawManager.batch(invoke, message);
     } else {
       // send things over to Flash
-      return this.flash[invoke](message);
+      try {
+        return this.flash[invoke](message);
+      } catch(exp) {
+        // This code is for crashing exception in Opera
+        // that occurs with scripts running in relation
+        // to an object that is unloaded.
+        console.log("Call to flash but flash is not present! " +
+                    invoke + ": " + this.debugMsg(message) + ": "+exp);
+      }
     }
   },
   
@@ -3032,6 +3079,8 @@ extend(FlashHandler, {
     // create proxy objects representing the Document and SVG root; these
     // kick off creating the Flash internally
     this.document = new _Document(this._xml, this);
+    // Note that documentElement starts off as a fake node and transforms
+    // to a proxy node in onRenderingFinished.
     this.document.documentElement = 
             new _SVGSVGElement(this._xml.documentElement, this._svgString,
                                this._scriptNode, this);
@@ -3112,7 +3161,9 @@ extend(FlashHandler, {
                 altKey: msg.altKey,
                 ctrlKey: msg.ctrlKey,
                 shiftKey: msg.shiftKey,
-                preventDefault: function() { this.returnValue=false; }
+                button: 0, // flash only supports left button
+                preventDefault: function() { this.returnValue=false; },
+                stopPropagation: function() { /* TODO */ }
               };
               
     var handlers = currentTarget._listeners[msg.eventType];
@@ -3120,7 +3171,16 @@ extend(FlashHandler, {
         for (var i = 0; i < handlers.length; i++) {
           var handler = handlers[i];
           var listener = handler.listener;
-          listener(evt);
+          // TODO: See Issue 208
+          // If the element is in an svg in an object,
+          // then the function needs to be called in the 
+          // proper sandbox (see below).
+          // See tests/browser-tests/test_events.html tests 10, 38
+          if (typeof listener == 'object') {
+            listener.handleEvent.call(listener, evt);
+          } else {
+            listener.call(evt.currentTarget, evt);
+          }
         }
     }
     if (msg.scriptCode != null) {
@@ -3138,16 +3198,19 @@ extend(FlashHandler, {
                     'altKey: ' + msg.altKey + ',\n' +
                     'ctrlKey: ' + msg.ctrlKey + ',\n' +
                     'shiftKey: ' + msg.shiftKey + ',\n' +
-                    'preventDefault: function() { this.returnValue=false; }\n' +
+                    'button: 0,\n' +
+                    'preventDefault: function() { this.returnValue=false; },\n' +
+                    'stopPropagation: function() { }\n' +
                   '};\n';
 
         // prepare the code for the correct object context.
         var executeInContext = ';(function (evt) { ' + msg.scriptCode + '; }' +
-                                    ').call(evt.target, evt);\n';
+                                    ').call(evt.currentTarget, evt);\n';
         // execute the code within the correct window context.
         this.sandbox_eval(this._svgObject._sandboxedScript(defineEvtCode + executeInContext));
       } else {
-        // TODO
+        var eventFunc = new Function(msg.scriptCode);
+        eventFunc.call(evt.currentTarget, evt);
       }
     }
   },
@@ -3175,6 +3238,11 @@ extend(FlashHandler, {
     
     // create or get an _Element for this XML DOM node for node
     node = FlashHandler._getNode(nodeXML, this);
+
+    // _guidLookup holds _Nodes, so if this is an HTC node, get the _Node instead
+    if(isIE && node._fakeNode) {
+        node = node._fakeNode;
+    }
     node._passThrough = true;
     
     return node;
@@ -3525,10 +3593,14 @@ NativeHandler._patchAddEventListener = function(root) {
   // so we can re-use this method (this is probably the source of the issue).
   // We later use this NativeHandler._objectAddEventListener cached instance 
   // inside of our custom addEventListener.
-  if (!NativeHandler._objectAddEventListener) {
+  if (root.nodeName == 'object' && !NativeHandler._objectAddEventListener) {
     NativeHandler._objectAddEventListener = root.addEventListener;
   }
-  root._addEventListener = NativeHandler._objectAddEventListener;
+  if (root.nodeName == 'object') {
+    root._addEventListener = NativeHandler._objectAddEventListener;
+  } else {
+    root._addEventListener = root.addEventListener
+  }
   root._onloadListeners = [];
   root.addEventListener = (function(self) {
     return function(type, f, useCapture) {
@@ -3616,6 +3688,15 @@ NativeHandler._patchStyleObject = function(win) {
   
   @param win The owner window to patch.
   @param doc The owner document to work with.
+
+  Note that there are different possible ways script code might get into a
+  patched window.addEventListener:
+     If it is called during onload or script tag code, then the script is
+  likely patched to run __svgHandler.window.addEventListener where
+  __svgHandler.window is a fake _SVGWindow object with a fake addEventListener.
+     If the script gets a hold of the real window object, it calls in the
+  patched 'real window' method. The following code is the code that patches
+  the real window.
 */
 NativeHandler._patchSvgFileAddEventListener = function(win, doc) {
   var _addEventListener = win.addEventListener;
@@ -3623,7 +3704,9 @@ NativeHandler._patchSvgFileAddEventListener = function(win, doc) {
     if (type.toLowerCase() != 'svgload') {
       _addEventListener(type, listener, useCapture);
     } else {
-      if (doc.readyState == 'complete') {
+      if (typeof listener == 'object') {
+        listener.handleEvent.call(listener, undefined);
+      } else {
         listener();
       }
     }
@@ -3915,9 +3998,12 @@ extend(_RedrawManager, {
     this._batch.push(method + ':' + message);
   },
   
-  suspendRedraw: function(ms) {
+  suspendRedraw: function(ms, notifyFlash) {
     if (ms === undefined) {
       throw 'Not enough arguments to suspendRedraw';
+    }
+    if (notifyFlash === undefined) {
+      notifyFlash = true;
     }
     
     // generate an ID
@@ -3936,12 +4022,24 @@ extend(_RedrawManager, {
     this._timeoutIDs['_' + id] = timeoutID;
     
     // tell Flash to stop rendering
-    this._handler.flash.jsSuspendRedraw();
-    
+    // there is a chance that suspendRedraw is called while the page
+    // is unloading from a setTimout interval; surround everything with a 
+    // try/catch block to prevent an exception from blocking page unload
+    if (notifyFlash) {
+      try {
+        this._handler.flash.jsSuspendRedraw();
+      } catch (exp) {
+        console.log("suspendRedraw exception: " + exp);
+      }
+    }
+      
     return id;
   },
   
-  unsuspendRedraw: function(id) {
+  unsuspendRedraw: function(id, notifiedFlash) {
+    if (notifiedFlash === undefined) {
+      notifiedFlash = true;
+    }
     
     var idx = -1;
     for (var i = 0; i < this._ids.length; i++) {
@@ -3964,7 +4062,11 @@ extend(_RedrawManager, {
     delete this._timeoutIDs['_' + id];
   
     // other suspendRedraws in effect or nothing to do?
-    if (this.isSuspended()) {
+    // Even if the length is zero, if flash was notified of the suspension
+    // then it needs to be notified of the unsuspension. If the caller
+    // knows flash was never notified of the suspension, they pass notifyFlash=false
+    // and we are free to exit here if there is no suspended work.
+    if (this.isSuspended() || (this._batch.length == 0 && !notifiedFlash)) {
       return;
     }
   
@@ -4678,7 +4780,11 @@ extend(_Node, {
                                     }
                                   }
                                   // call the developer's listener now
-                                  listener(evt);
+                                  if (typeof listener == 'object') {
+                                    listener.handleEvent.call(listener, evt);
+                                  } else {
+                                    listener(evt);
+                                  }
                                 }
                               })(listener);
       // persist information about this listener so we can easily remove
@@ -4905,12 +5011,16 @@ extend(_Node, {
     }
     
     // are we the root SVG node when being embedded by an SVG SCRIPT?
-    if (this.nodeName == 'svg' && this._handler.type == 'script') {
-      return this._handler.flash.parentNode;
-    } else if (this.nodeName == 'svg' && this._handler.type == 'object') {
-      // if we are the root SVG node and are embedded by an SVG OBJECT, then
-      // our parent is a #document object
-      return this._handler.document;
+    // If _handler is not set, this element is a detached svg element.
+    if (this._handler &&
+        this._getProxyNode() == this._handler.document.rootElement) {
+      if (this._handler.type == 'script') {
+        return this._handler.flash.parentNode;
+      } else if (this._handler.type == 'object') {
+        // if we are the root SVG node and are embedded by an SVG OBJECT, then
+        // our parent is a #document object
+        return this._handler.document;
+      }
     }
     
     var parentXML = this._nodeXML.parentNode;
@@ -4963,7 +5073,10 @@ extend(_Node, {
     }
     
     // are we the root SVG object when being embedded by an SVG SCRIPT?
-    if (this.nodeName == 'svg' && this._handler.type == 'script') {
+    // If _handler is not set, this element is a nested svg element.
+    if (this._handler && 
+        this._getProxyNode() == this._handler.document.rootElement
+                      && this._handler.type == 'script') {
       var sibling = this._handler.flash.previousSibling;
       // is our previous sibling also an SVG object?
       if (sibling && sibling.nodeType == 1 && sibling.className 
@@ -4996,7 +5109,10 @@ extend(_Node, {
     }
       
     // are we the root SVG object when being embedded by an SVG SCRIPT?
-    if (this.nodeName == 'svg' && this._handler.type == 'script') {
+    // If _handler is not set, this element is a nested svg element.
+    if (this._handler &&
+        this._getProxyNode() == this._handler.document.rootElement
+                      && this._handler.type == 'script') {
       var sibling = this._handler.flash.nextSibling;
       
       // is our previous sibling also an SVG object?
@@ -5290,13 +5406,12 @@ extend(_Node, {
     var suspendID;
     if (child.nodeType == _Node.DOCUMENT_FRAGMENT_NODE) {
       current = this._getFakeNode(child._getFirstChild());
-      
-      // turn on suspendRedraw so adding our event handlers happens in one go
-      if (attached && passThrough) {
-        suspendID = this._handler._redrawManager.suspendRedraw(10000);
-      }
     } else {
       current = child;
+    }
+    // turn on suspendRedraw so adding our event handlers happens in one go
+    if (attached && passThrough) {
+      suspendID = this._handler._redrawManager.suspendRedraw(10000, false);
     }
 
     while (current) {
@@ -5320,15 +5435,15 @@ extend(_Node, {
         } else if (this._handler.type == 'object') {
           current.ownerDocument = this._handler.document;
         }
-      }
-    
-      if (attached) {
+
         // register and send over any event listeners that were added while
         // this node was detached
         for (var i = 0; i < current._detachedListeners.length; i++) {
           var addMe = current._detachedListeners[i];
-          current.addEventListener(addMe.type, addMe.listener, 
+          if (addMe) {
+            current.addEventListener(addMe.type, addMe.listener, 
                                    addMe.useCapture, true);
+          }
         }
         current._detachedListeners = [];
       }
@@ -5364,9 +5479,10 @@ extend(_Node, {
             current = current._fakeNode;
           }
 
-          if (current && 
-                  (current.nodeType != 1 || 
-                   current.nodeName.toUpperCase() == 'SVG')) {
+          // Do not traverse non-elements or retrace up past the root
+          if (current && ((current.nodeType != 1)
+              || (current._handler
+                  && current._getProxyNode() == current._handler.document.rootElement ))) { 
             current = null;
           }
         }
@@ -5377,11 +5493,9 @@ extend(_Node, {
       lastVisited._passThrough = passThrough;
     }
     
-    // turn off suspendRedraw if dealing with a DocumentFragment; all 
-    // event handlers should shoot through now
-    if (child.nodeType == _Node.DOCUMENT_FRAGMENT_NODE 
-        && attached && passThrough) {
-      this._handler._redrawManager.unsuspendRedraw(suspendID);
+    // turn off suspendRedraw. all event handlers should shoot through now
+    if (attached && passThrough) {
+      this._handler._redrawManager.unsuspendRedraw(suspendID, false);
     }
   },
   
@@ -5710,6 +5824,7 @@ function _Element(nodeName, prefix, namespaceURI, nodeXML, handler,
     // track .style changes; 
     if (isIE 
         && this._attached 
+        && this._handler
         && this._handler.type == 'script' 
         && this.nodeName == 'svg') {
       // do nothing now -- if we are IE and are being embedded with an
@@ -5722,6 +5837,7 @@ function _Element(nodeName, prefix, namespaceURI, nodeXML, handler,
     // handle style changes for HTCs
     if (isIE 
         && this._attached
+        && this._handler
         && this._handler.type == 'script' 
         && this.nodeName == 'svg') {
       // do nothing now - if we are IE we delay creating the style property
@@ -5856,7 +5972,8 @@ extend(_Element, {
     }
     
     if (!attrNode) {
-      // JL: This happens under protovis all the time. Remove the warning for the time being.
+      // JL (jamie love) Remove this warning, The way that protovis works
+      // means it is called a lot.
       //console.log('No attribute node found for: ' + localName
       //            + ' in the namespace: ' + ns);
       return;
@@ -5957,6 +6074,22 @@ extend(_Element, {
         this._nodeXML.setAttribute(qName, attrValue);
       } else {
         this._nodeXML.setAttributeNS(ns, qName, attrValue);
+      }
+    }
+
+    // If this is a namespace attribute, add it to the global
+    // list of SVG related namespaces so that we know whether
+    // to create fake elements or native elements for that
+    // namespace. See Issue 507.
+    if (/^xmlns:?(.*)$/.test(qName)) {
+      var m = qName.match(/^xmlns:?(.*)$/);
+      var prefix = (m[1] ? m[1] : 'xmlns');
+      var namespaceURI = attrValue;
+
+      // don't add duplicates
+      if (!svgweb._allSVGNamespaces['_' + prefix]) {
+        svgweb._allSVGNamespaces['_' + prefix] = namespaceURI;
+        svgweb._allSVGNamespaces['_' + namespaceURI] = prefix;
       }
     }
 
@@ -6099,7 +6232,7 @@ extend(_Element, {
     
     // When doing wildcards on local name and namespace text nodes
     // can also sometimes be included; filter them out
-    if (ns == '*' && localName == '*') {
+    if ((ns == '*' || ns == svgnsFake) && localName == '*') {
       var temp = [];
       for (var i = 0; i < results.length; i++) {
         if (results[i].nodeType == _Node.ELEMENT_NODE
@@ -6119,6 +6252,26 @@ extend(_Element, {
     }
     
     return nodes;
+  },
+
+  beginElement: function() {
+    this.beginElementAt(0);
+  },
+
+  endElement: function() {
+    this.endElementAt(0);
+  },
+
+  beginElementAt: function(offset) {
+    if (this._attached && this._passThrough) {
+      this._handler.sendToFlash('jsBeginElementAt', [ this._guid, offset ]);
+    }
+  },
+
+  endElementAt: function(offset) {
+    if (this._attached && this._passThrough) {
+      this._handler.sendToFlash('jsEndElementAt', [ this._guid, offset ]);
+    }
   },
 
   /*
@@ -6464,8 +6617,9 @@ extend(_Style, {
       
       // root SVGSVGElement nodes have some extra properties from being in an
       // HTML context
-      // FIXME: Make sure nested SVG nodes don't hit this code
-      if (this._element.nodeName == 'svg') {
+      // If _handler is not set, this element is a nested svg element.
+      if (this._element._handler
+            && this._element._getProxyNode() == this._element._handler.document.rootElement) {
         for (var i = 0; i < _Style._allRootStyles.length; i++) {
           var styleName = _Style._allRootStyles[i];
           this._defineAccessor(styleName);
@@ -6484,7 +6638,13 @@ extend(_Style, {
       for (var i = 0; i < parsedStyle.length; i++) {
         var styleName = this._toCamelCase(parsedStyle[i].styleName);
         var styleValue = parsedStyle[i].styleValue;
-        htcStyle[styleName] = styleValue;
+        // Issue 485: Cannot set textAlign style on IE
+        try {
+          htcStyle[styleName] = styleValue;
+        } catch (exp) {
+          console.log('The following exception occurred setting style.'
+                      + styleName + ' on IE: ' + (exp.message || exp));
+        }
       }
       
       // set initial values for style.length
@@ -7108,7 +7268,7 @@ extend(_SVGObject, {
     
     // add our onload handler to the list of scripts to execute at the
     // beginning
-    var onload = root.getAttribute('onload');
+    var onload = rootXML.getAttribute('onload');
     if (onload) {
       // we want 'this' inside of the onload handler to point to our
       // SVG root; the 'document.documentElement' will get rewritten later by
@@ -7118,7 +7278,7 @@ extend(_SVGObject, {
                     'currentTarget: document.getElementById("' + root.getAttribute('id') + '") ,' +
                     'preventDefault: function() { this.returnValue=false; }' +
                   '};';
-      onload = '(function(){' + defineEvtCode + onload + '}).apply(document.documentElement);';
+      onload = ';(function(){' + defineEvtCode + onload + '}).apply(document.documentElement);';
       this._scriptsToExec.push(onload);
     }
     
@@ -7201,17 +7361,33 @@ extend(_SVGObject, {
     // Add code to set back an eval function we can use for further execution.
     // Code adapted from blog post by YuppY:
     // http://dean.edwards.name/weblog/2006/11/sandbox/
-    script = script + ';__svgHandler.sandbox_eval = ' +
+    script = script + ';if (__svgHandler) __svgHandler.sandbox_eval = ' +
              (isIE ? 'window.eval;'
                    : 'function(scriptCode) { return window.eval(scriptCode) };');
 
-    // now insert the script into the iframe to execute it in a siloed way
-    iframeDoc.write('<script>' + script + '</script>');
-    iframeDoc.close();
+    if (isOpera) {
+        var _win = this;
+        // Opera 10.53 just kills this event thread (see test_js2.html),
+        // so we switch to a new execution context to buy more time on a
+        // more appropriate thread.
+        var timeoutFunc =
+          setTimeout((function(_handlerwin, iframeWin, script) {
+                      return function() {
+                        // Opera 10.53 hangs on creating the script tag (see
+                        // test_js2.html), so try running the code this way.
+                        iframeWin.eval.apply(iframeWin, [script]);
+                        _handlerwin._fireOnload();
+                      };
+                    })(this._handler.window, iframeWin, script), 1);
+    } else {
+      // now insert the script into the iframe to execute it in a siloed way
+      iframeDoc.write('<script>' + script + '</script>');
+      iframeDoc.close();
+      // execute any addEventListener(onloads) that might have been
+      // registered
+      this._handler.window._fireOnload();
+    }
     
-    // execute any addEventListener(onloads) that might have been
-    // registered
-    this._handler.window._fireOnload();
   },
 
   _sandboxedScript: function(script) {
@@ -7323,7 +7499,7 @@ function _SVGWindow(handler) {
 
 extend(_SVGWindow, {
   addEventListener: function(type, listener, capture) {
-    if (type.toLowerCase() == 'SVGLoad') {
+    if (type.toLowerCase() == 'svgload' || type.toLowerCase() == 'load') {
       this._onloadListeners.push(listener);
     }
   },
@@ -8576,7 +8752,14 @@ extend(_Document, {
     var prefix = this._namespaces['_' + ns];
     
     if (prefix == 'xmlns' || !prefix) { // default SVG namespace
-      prefix = null;
+      // If this is a new namespace, we may have to assume the
+      // prefix from the qname
+      if (qname.indexOf(':') != -1) {
+        prefix=qname.substring(0, qname.indexOf(':'))
+      }
+      else {
+       prefix = null;
+      }
     }
 
     var node = new _Element(qname, prefix, ns);
