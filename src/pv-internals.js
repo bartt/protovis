@@ -159,18 +159,21 @@ pv.listenForPageLoad = function(listener) {
     }
 
     if (pv.renderer() == "svgweb") {
-        window.addEventListener( "SVGLoad", listener, false );
+        // Mozilla, Opera and webkit nightlies currently support this event
+        if ( document.addEventListener ) {
+            window.addEventListener( "SVGLoad", listener, false );
+
+            // If IE event model is used
+        } else if ( document.attachEvent ) {
+            window.attachEvent( "SVGLoad", listener );
+        }
     } else {
         // Mozilla, Opera and webkit nightlies currently support this event
         if ( document.addEventListener ) {
-
-            // A fallback to window.onload, that will always work
             window.addEventListener( "load", listener, false );
 
             // If IE event model is used
         } else if ( document.attachEvent ) {
-
-            // A fallback to window.onload, that will always work
             window.attachEvent( "load", listener );
         }
     }
