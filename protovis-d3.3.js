@@ -1,4 +1,4 @@
-// 2db01e91acd616e89c2ae68a5534d2be0b11e833
+// 3f34a7a7e6b0134581100f5d37dbca15b7378552
 /**
  * @class The built-in Array class.
  * @name Array
@@ -366,24 +366,13 @@ pv.listenForPageLoad = function(listener) {
         listener();
     }
 
-    if (pv.renderer() == "svgweb") {
-        // Mozilla, Opera and webkit nightlies currently support this event
-        if ( document.addEventListener ) {
-            window.addEventListener( "SVGLoad", listener, false );
+    // Mozilla, Opera and webkit nightlies currently support this event
+    if ( document.addEventListener ) {
+        window.addEventListener( "load", listener, false );
 
-            // If IE event model is used
-        } else if ( document.attachEvent ) {
-            window.attachEvent( "SVGLoad", listener );
-        }
-    } else {
-        // Mozilla, Opera and webkit nightlies currently support this event
-        if ( document.addEventListener ) {
-            window.addEventListener( "load", listener, false );
-
-            // If IE event model is used
-        } else if ( document.attachEvent ) {
-            window.attachEvent( "load", listener );
-        }
+        // If IE event model is used
+    } else if ( document.attachEvent ) {
+        window.attachEvent( "onload", listener );
     }
 }
 
